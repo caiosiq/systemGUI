@@ -1209,11 +1209,25 @@ class System2:
             quit()
 
     def test(self):
-        from pymodbus.client import ModbusTcpClient
-        client = ModbusTcpClient(host="169.254.92.250")
-        client.write_coil(address=8386, value=False)
-        client.write_coil(address=8387, value=False)
-        print('testing complete')
-        pass
+        import serial
+        p = f'COM{NotImplementedError}' #put in port number
+        ser = serial.Serial(port=p, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
+                            bytesize=serial.EIGHTBITS, timeout=1)
+        print("connected to: " + ser.portstr)
+
+        #turn on 
+        ser.write('1H[CR]\r\n'.encode('ascii'))
+        response = ser.readline().decode('ascii')
+        print(f'{ser.portstr}: {response}')
+
+        #set flow rate
+        ser.write('1f1300-3[CR]\r\n'.encode('ascii'))
+        response = ser.readline().decode('ascii')
+        print(f'{ser.portstr}: {response}')
+        
+        # #turn off
+        # ser.write('1I[CR]\r\n'.encode('ascii'))
+        # response = ser.readline().decode('ascii')
+        # print(f'{ser.portstr}: {response}')
 
 gui = System2()
