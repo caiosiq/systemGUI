@@ -42,6 +42,7 @@ pump_controllers = [
 ]
 matrix_lengths = [10] * len(pump_controllers)
 
+
 class System2:
     def __init__(self):
         self.root = tk.Tk()
@@ -291,15 +292,16 @@ class System2:
         self.pressure_regulator_connect_button.grid(row=0, column=0)
 
         for i, name in enumerate(self.pressure_regulator_list):
-            tk.Label(pressure_regulator_frame, text=name).grid(row=i+1, column=0)
+            tk.Label(pressure_regulator_frame, text=name).grid(row=i + 1, column=0)
 
             self.pressure_regulator_var = tk.StringVar()
             self.pressure_regulator_var.set("0")
             self.pressure_regulator_vars.append(self.pressure_regulator_var)
             pressure_regulator_entry = tk.Entry(pressure_regulator_frame, textvariable=self.pressure_regulator_var)
-            pressure_regulator_entry.grid(row=i+1, column=1, padx=15, pady=10)
+            pressure_regulator_entry.grid(row=i + 1, column=1, padx=15, pady=10)
             self.pressure_regulator_entries.append(pressure_regulator_entry)
-            tk.Button(pressure_regulator_frame, text="Enter", command=lambda i=i: self.write_float_values(i, "pressure regulator")).grid(row=i+1, column=2)
+            tk.Button(pressure_regulator_frame, text="Enter",
+                      command=lambda i=i: self.write_float_values(i, "pressure regulator")).grid(row=i + 1, column=2)
 
         pressure_regulator_frame.pack(anchor="nw", padx=15)
 
@@ -313,7 +315,8 @@ class System2:
         tk.Label(
             equipment_frame, text="Pressure In Out", font=("Arial", 16, "underline")
         ).pack(anchor="nw", padx=15, pady=(10, 0))
-        self.pressure_inouts_list = ["Pressure 1 In", "Pressure 1 Out", "Pressure 2 In", "Pressure 2 Out", "Pressure 3 In", "Pressure 3 Out"]
+        self.pressure_inouts_list = ["Pressure 1 In", "Pressure 1 Out", "Pressure 2 In", "Pressure 2 Out",
+                                     "Pressure 3 In", "Pressure 3 Out"]
 
         self.pressure_inout_on_buttons = []
         self.pressure_inout_off_buttons = []
@@ -332,7 +335,7 @@ class System2:
 
         for i, pressure_inout_name in enumerate(self.pressure_inouts_list):
             # pressure_inout names
-            tk.Label(pressure_inouts_frame, text=pressure_inout_name).grid(row=i+1, column=0, sticky="w")
+            tk.Label(pressure_inouts_frame, text=pressure_inout_name).grid(row=i + 1, column=0, sticky="w")
 
             # On/Off buttons
             pressure_inout_on_button = tk.Button(
@@ -343,8 +346,8 @@ class System2:
                 pressure_inouts_frame, text="Off", width=10, command=lambda i=i: self.pressure_inout_onoff(i, False)
             )
             self.pressure_inout_off_buttons.append(pressure_inout_off_button)
-            pressure_inout_on_button.grid(row=i+1, column=1, padx=15)
-            pressure_inout_off_button.grid(row=i+1, column=2, padx=15)
+            pressure_inout_on_button.grid(row=i + 1, column=1, padx=15)
+            pressure_inout_off_button.grid(row=i + 1, column=2, padx=15)
 
         self.pressure_inout_address_vars = [None for _ in self.pressure_inouts_list]
         pressure_inouts_frame.pack(anchor="nw", padx=15)
@@ -372,7 +375,7 @@ class System2:
         self.valve_connect_button.grid(row=0, column=0)
         for i, valve_name in enumerate(self.valves_list):
             # Valve names
-            tk.Label(valves_frame, text=valve_name).grid(row=i+1, column=0, sticky="w")
+            tk.Label(valves_frame, text=valve_name).grid(row=i + 1, column=0, sticky="w")
 
             # On/Off buttons
             valve_on_button = tk.Button(
@@ -383,8 +386,8 @@ class System2:
                 valves_frame, text="Off", width=10, command=lambda i=i: self.valve_onoff(i, False)
             )
             self.valve_off_buttons.append(valve_off_button)
-            valve_on_button.grid(row=i+1, column=1, padx=15)
-            valve_off_button.grid(row=i+1, column=2, padx=15)
+            valve_on_button.grid(row=i + 1, column=1, padx=15)
+            valve_off_button.grid(row=i + 1, column=2, padx=15)
 
         self.valve_address_vars = [None for _ in self.valves_list]
         valves_frame.pack(anchor="nw", padx=15)
@@ -411,15 +414,16 @@ class System2:
         self.stirrer_connect_button.grid(row=0, column=0)
 
         for i, name in enumerate(self.stirrer_list):
-            tk.Label(stirrer_frame, text=name).grid(row=i+1, column=0)
+            tk.Label(stirrer_frame, text=name).grid(row=i + 1, column=0)
 
             self.stirrer_var = tk.StringVar()
             self.stirrer_var.set("0")
             self.stirrer_vars.append(self.stirrer_var)
             stirrer_entry = tk.Entry(stirrer_frame, textvariable=self.stirrer_var)
-            stirrer_entry.grid(row=i+1, column=1, padx=15, pady=10)
+            stirrer_entry.grid(row=i + 1, column=1, padx=15, pady=10)
             self.stirrer_entries.append(stirrer_entry)
-            tk.Button(stirrer_frame, text="Enter", command=lambda i=i: self.write_float_values(i, "stirrer")).grid(row=i+1, column=2)
+            tk.Button(stirrer_frame, text="Enter", command=lambda i=i: self.write_float_values(i, "stirrer")).grid(
+                row=i + 1, column=2)
 
         stirrer_frame.pack(anchor="nw", padx=15)
 
@@ -462,16 +466,17 @@ class System2:
         )
 
         # Initiate Classes
-        print('remember to change line self.temp_plc = temp(....)')
-        self.temp_plc = read_floats_class(NotImplementedError, NotImplementedError)  # put the host_num directly in __init__
+        print('remember to change line self.temp_plc = read_floats_class(....)')
+        plc_host_num = NotImplementedError
+        self.temp_plc = read_floats_class(plc_host_num, NotImplementedError)  # put the host_num directly in __init__
         self.temp_plc.set_graph_obj(self.g)
-        self.pressure_transmitter_plc = read_floats_class(NotImplementedError, NotImplementedError)
+        self.pressure_transmitter_plc = read_floats_class(plc_host_num, plc_host_num)
         self.pressure_transmitter_plc.set_graph_obj(self.g)
-        self.pressure_inout_plc = one_bit_class(NotImplementedError)
-        self.valve_plc = one_bit_class(NotImplementedError)
-        self.stirrer_plc = write_floats_class(NotImplementedError)
-        self.pressure_regulator_plc = write_floats_class(NotImplementedError)
-    
+        self.pressure_inout_plc = one_bit_class(plc_host_num)
+        self.valve_plc = one_bit_class(plc_host_num)
+        self.stirrer_plc = write_floats_class(plc_host_num)
+        self.pressure_regulator_plc = write_floats_class(plc_host_num)
+
         # Checkboxes for different data
         data_types_frame = tk.Frame(data_frame)
         self.data_types = ["Temperature", "Pressure", "Balance", "Flow_Rate"]
@@ -673,7 +678,6 @@ class System2:
         )  # press escape button on keyboard to close the GUI
         self.root.mainloop()
 
-
     # equipment functions
     # pumps
     def pump_connect(self, pump_index):
@@ -804,7 +808,7 @@ class System2:
             self.valve_off_buttons[i].config(bg="LightSkyBlue1")
             self.valve_on_buttons[i].config(bg="SystemButtonFace")
             self.valve_plc.write_onoff(address_num=self.valve_address_vars[i], boolean=False)
-    
+
     def valve_connect(self):
         if self.valve_connect_var.get() == 0:  # if not connected, connect
             self.valve_connect_button.config(bg="pale green", text="Connected")
@@ -872,7 +876,7 @@ class System2:
                 if t:
                     t.daemon = True
                     t.start()
-    
+
     def stirrer_connect(self):
         if self.stirrer_connect_var.get() == 0:  # if not connected, connect
             self.stirrer_connect_button.config(bg="pale green", text="Connected")
@@ -892,7 +896,7 @@ class System2:
             self.pressure_regulator_connect_var.set(0)
             self.pressure_regulator_connect_button.config(bg="SystemButtonFace", text="Connect")
             self.pressure_regulator_plc.disconnect()
-        
+
     def write_float_values(self, index, equipment_type):
         """
         Function to write float values to PLC. Equipment type will be:
@@ -944,7 +948,7 @@ class System2:
             self.pump_type_var = tk.StringVar()
             if self.pump_type_vars[
                 i
-            ]:  # populate assign page with previously assigned 
+            ]:  # populate assign page with previously assigned
                 self.pump_type_var.set(self.pump_type_vars[i].get())
             pump_type_entry = tk.Entry(pump_frame, textvariable=self.pump_type_var)
             pump_type_entry.grid(row=i + 1, column=1, padx=5)
@@ -1041,7 +1045,7 @@ class System2:
 
         temp_frame.pack(pady=10)
 
-        #Pressure Regulator
+        # Pressure Regulator
         pressure_regulator_frame = tk.Frame(self.assign_page)
         tk.Label(
             pressure_regulator_frame, text="pressure_regulator Name", font=("TkDefaultFont", 9, "underline")
@@ -1062,8 +1066,10 @@ class System2:
                 pressure_regulator_reg1_var.set(self.pressure_regulator_reg1_vars[i].get())
             if self.pressure_regulator_reg2_vars[i]:
                 pressure_regulator_reg2_var.set(self.pressure_regulator_reg2_vars[i].get())
-            pressure_regulator_var_reg1_entry = tk.Entry(pressure_regulator_frame, textvariable=pressure_regulator_reg1_var)
-            pressure_regulator_var_reg2_entry = tk.Entry(pressure_regulator_frame, textvariable=pressure_regulator_reg2_var)
+            pressure_regulator_var_reg1_entry = tk.Entry(pressure_regulator_frame,
+                                                         textvariable=pressure_regulator_reg1_var)
+            pressure_regulator_var_reg2_entry = tk.Entry(pressure_regulator_frame,
+                                                         textvariable=pressure_regulator_reg2_var)
             pressure_regulator_var_reg1_entry.grid(row=i + 1, column=1, padx=5)
             pressure_regulator_var_reg2_entry.grid(row=i + 1, column=2, padx=5)
             self.pressure_regulator_reg1_vars[i] = pressure_regulator_reg1_var
@@ -1092,8 +1098,10 @@ class System2:
                 pressure_transmitter_reg1_var.set(self.pressure_transmitter_reg1_vars[i].get())
             if self.pressure_transmitter_reg2_vars[i]:
                 pressure_transmitter_reg2_var.set(self.pressure_transmitter_reg2_vars[i].get())
-            pressure_transmitter_var_reg1_entry = tk.Entry(pressure_transmitter_frame, textvariable=pressure_transmitter_reg1_var)
-            pressure_transmitter_var_reg2_entry = tk.Entry(pressure_transmitter_frame, textvariable=pressure_transmitter_reg2_var)
+            pressure_transmitter_var_reg1_entry = tk.Entry(pressure_transmitter_frame,
+                                                           textvariable=pressure_transmitter_reg1_var)
+            pressure_transmitter_var_reg2_entry = tk.Entry(pressure_transmitter_frame,
+                                                           textvariable=pressure_transmitter_reg2_var)
             pressure_transmitter_var_reg1_entry.grid(row=i + 1, column=1, padx=5)
             pressure_transmitter_var_reg2_entry.grid(row=i + 1, column=2, padx=5)
             self.pressure_transmitter_reg1_vars[i] = pressure_transmitter_reg1_var
@@ -1101,7 +1109,7 @@ class System2:
 
         pressure_transmitter_frame.pack(pady=10)
 
-        #Stirrer
+        # Stirrer
         stirrer_frame = tk.Frame(self.assign_page)
         tk.Label(
             stirrer_frame, text="Stirrer Name", font=("TkDefaultFont", 9, "underline")
@@ -1209,25 +1217,196 @@ class System2:
             quit()
 
     def test(self):
-        import serial
-        p = f'COM{NotImplementedError}' #put in port number
-        ser = serial.Serial(port=p, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
-                            bytesize=serial.EIGHTBITS, timeout=1)
-        print("connected to: " + ser.portstr)
-
-        #turn on 
-        ser.write('1H[CR]\r\n'.encode('ascii'))
-        response = ser.readline().decode('ascii')
-        print(f'{ser.portstr}: {response}')
-
-        #set flow rate
-        ser.write('1f1300-3[CR]\r\n'.encode('ascii'))
-        response = ser.readline().decode('ascii')
-        print(f'{ser.portstr}: {response}')
-        
-        # #turn off
+        # import serial
+        # p_in = f'COM{8}'  # put in port number
+        # ser_in = serial.Serial(port=p_in, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
+        #                     bytesize=serial.EIGHTBITS, timeout=1)
+        # print("connected to: " + ser_in.portstr)
+        # p_out = f'COM{5}'  # put in port number
+        # ser_out = serial.Serial(port=p_out, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
+        #                     bytesize=serial.EIGHTBITS, timeout=1)
+        # print("connected to: " + ser_out.portstr)
+        #
+        # # turn on
+        # ser_in.write('1H[CR]\r\n'.encode('ascii'))
+        # response = ser_out.readline().decode('ascii')
+        # print(f'{ser_out.portstr}: {response}')
+        #
+        # # set flow rate
+        # ser.write('1f1300-3[CR]\r\n'.encode('ascii'))
+        # response = ser.readline().decode('ascii')
+        # print(f'{ser.portstr}: {response}')
+        #
+        # # #turn off
         # ser.write('1I[CR]\r\n'.encode('ascii'))
         # response = ser.readline().decode('ascii')
         # print(f'{ser.portstr}: {response}')
+
+        # p = f'COM{8}'  # put in port number
+        # ser = serial.Serial(port=p, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
+        #                     bytesize=serial.EIGHTBITS, timeout=1)
+        # print("connected to: " + ser.portstr)
+        #
+        # # turn on
+        # ser.write('1H[CR]\r\n'.encode('ascii'))
+        # response = ser.readline().decode('ascii')
+        # print(f'{ser.portstr}: {response}')
+        #
+        # ser.close()
+
+        # set flow rate
+        # ser.write('1f1300-3[CR]\r\n'.encode('ascii'))
+        # response = ser.readline().decode('ascii')
+        # print(f'{ser.portstr}: {response}')
+
+        #turn off
+        # ser.write('1I[CR]\r\n'.encode('ascii'))
+        # response = ser.readline().decode('ascii')
+        # print(f'{ser.portstr}: {response}')
+        '''
+        ------------------------------------------
+        Reglo ICC Peristaltic Pump Control Library
+        ------------------------------------------
+        '''
+
+        import serial
+        import time
+
+        # ---------------------------------------------------------------------------------#
+        # LIBRARY MANAGING THE COMMUNICATION WITH A REGLO ICC WITH 3 INDEPENDENT CHANNELS #
+        # ---------------------------------------------------------------------------------#
+
+        class RegloICC:
+            # Initialize the pump
+            def __init__(self, COM):
+                self.COM = COM
+                # Open the serial port with the data format corresponding to the RegloICC pump
+                self.sp = serial.Serial(self.COM, 9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
+                                        bytesize=serial.EIGHTBITS)
+                self.direction = [0, 0, 0]  # 0 = clockwise, 1 = counter-clockwise
+                self.mode = [0, 0,
+                             0]  # 0 = RPM, 1 = Flow Rate, 2 = Volume (over time), one can add here all other modes
+                self.speed = [0, 0, 0]  # rotation speed for each channel in RPM mode
+                # Change the size of 'direction', 'mode' and 'speed' according to the total number of channels to control.
+                # In the case herein, 3 channels are being independently controlled
+
+            # Delete the pump
+            def __del__(self):
+                self.sp.close()
+
+            # Start the corresponding channel
+            def start_channel(self, channel):
+                command = f'{channel}H\r'.encode()  # 'H' to start the channel
+                # \r for the carriage return [CR] required to tell the pump that the command is finished
+                self.sp.write(command)  # write the command to the pump
+                time.sleep(
+                    0.1)  # give the pump time to process the command after sending it before reading the response
+                return self.sp.read(self.sp.in_waiting).decode()  # read the pump response
+
+            # Stop the corresponding channel
+            def stop_channel(self, channel):
+                command = f'{channel}I\r'.encode()  # 'I' to stop the channel
+                self.sp.write(command)
+                time.sleep(0.1)
+                return self.sp.read(self.sp.in_waiting).decode()
+
+            # Set the rotation direction for a single channel
+            def set_direction(self, channel, direction):
+                if direction == 1:
+                    command = f'{channel}K\r'.encode()  # counter-clockwise
+                else:
+                    command = f'{channel}J\r'.encode()  # clockwise
+                self.sp.write(command)
+                self.direction[channel - 1] = direction  # pyhton count starts from 0
+                time.sleep(0.1)
+                return self.sp.read(self.sp.in_waiting).decode()
+
+            # Get the rotation direction of a single channel
+            def get_direction(self, channel):
+                command = f'{channel}xD\r'.encode()  # 'xD' to get the rotation direction
+                self.sp.write(command)
+                time.sleep(0.1)
+                # read the rotation direction from the corresponding channel
+                return self.sp.read(self.sp.in_waiting).decode()
+
+            # Set the speed for a single channel in RPM when in RPM mode
+            def set_speed(self, channel, speed):  # in RPM, with speed  Result: '123'                       #
+
+            # #
+            ## Convert the decimal part to a string with two digits :                        #
+            # decimal_part = f'{int((speed - int(speed)) * 100)}'; ## --&gt; Result: '45'       #
+            #                                                                                #
+            ## Concatenate the two parts :                                                   #
+            # speed_string = f'{int(speed):03d}{int((speed - int(speed)) * 100)}';           #
+            ## --&gt; Result: '12345' representing 123.45 in fixed-point notation               #
+            #                                                                                #
+            ## When the two strings are concatenated, the result is a string that represents #
+            ## the original speed value in a fixed-point notation with three digits before   #
+            ## the decimal point and two digits after, without the decimal separator.        #
+            # --------------------------------------------------------------------------------#
+
+            # Read out speed of a single channel in RPM when in RPM mode
+            def get_speed(self, channel):
+                command = f'{channel}S\r'.encode()  # 'S' to get the setting speed in RPM
+                self.sp.write(command)
+                time.sleep(0.1)
+                return self.sp.read(self.sp.in_waiting).decode()
+
+            # Set the operational mode for a single channel (you can add all other modes)
+            def set_mode(self, channel, mode):
+                if mode == 0:
+                    command = f'{channel}L\r'.encode()  # RPM mode
+                elif mode == 1:
+                    command = f'{channel}M\r'.encode()  # Flow rate mode
+                else:
+                    command = f'{channel}G\r'.encode()  # Volume (over time) mode
+                self.sp.write(command)
+                self.mode[channel - 1] = mode
+                time.sleep(0.1)
+                return self.sp.read(self.sp.in_waiting).decode()
+
+            # Get the operational mode of a single channel
+            def get_mode(self, channel):
+                command = f'{channel}xM\r'.encode()  # 'xM' to get the operational mode
+                self.sp.write(command)
+                time.sleep(0.1)
+                return self.sp.read(self.sp.in_waiting).decode()
+
+        # ----------------------------------------------------------------------------#
+        #   EXAMPLES ON HOW TO USE THE DEFINED CLASS TO CONTROL THE Reglo ICC PUMP   #
+        # ----------------------------------------------------------------------------#
+
+        ### Initialize the pump with the specified COM port
+        pump = RegloICC('COM8')  # Replace 'COM8' with your actual COM port
+
+        ### Start channel 1
+        pump.start_channel(1)
+
+        ### Get the rotation direction of channel 1
+        print(pump.get_direction(1))
+
+        ### Set the rotation direction of channel 1 to clockwise
+        pump.set_direction(1, 0)
+
+        ### Get the current operational mode of channel 1
+        print(pump.get_mode(1))
+
+        ### Set the operational mode of channel 1 to RPM
+        pump.set_mode(1, 0)
+
+        ### Get the current speed setting of channel 1
+        print(pump.get_speed(1))
+
+        ### Set the setting speed of channel 1 to 24 RPM
+        pump.set_speed(1, 24)
+
+        ### Stop channel 1
+        pump.stop_channel(1)
+
+        ### Delete the pump object
+        del pump
+
+
+
 
 gui = System2()
