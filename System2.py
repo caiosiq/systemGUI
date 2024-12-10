@@ -124,9 +124,9 @@ class System2:
         self.pump_off_buttons = []
         self.pump_flow_entry_vars = []
 
-        self.pump_pid_classes = [None] * len(self.pumps_list)
-        self.pump_pid_threads_started = [False] * len(self.pumps_list)
-        self.pid_vars = [tk.BooleanVar(value=True) for _ in self.pumps_list]
+        # self.pump_pid_classes = [None] * len(self.pumps_list)
+        # self.pump_pid_threads_started = [False] * len(self.pumps_list)
+        # self.pid_vars = [tk.BooleanVar(value=True) for _ in self.pumps_list]
 
         for i, pump_name in enumerate(self.pumps_list):
             # Pump names
@@ -174,19 +174,19 @@ class System2:
             pump_set_flow_rate_button.grid(row=i + 1, column=5)
 
             # use pid or no
-            data_types_checkbox = tk.Checkbutton(
-                pumps_frame,
-                text="PID",
-                variable=self.pid_vars[i],
-                command=lambda i=i: self.change_pid_onoff(i),
-            )
-            data_types_checkbox.grid(row=i + 1, column=6)
+            # data_types_checkbox = tk.Checkbutton(
+            #     pumps_frame,
+            #     text="PID",
+            #     variable=self.pid_vars[i],
+            #     command=lambda i=i: self.change_pid_onoff(i),
+            # )
+            # data_types_checkbox.grid(row=i + 1, column=6)
 
         pumps_frame.pack(anchor="nw", padx=15)
 
         self.pump_type_vars = [None for _ in self.pumps_list]
         self.pump_port_vars = [None for _ in self.pumps_list]
-        self.balance_port_vars = [None for _ in self.pumps_list]
+        # self.balance_port_vars = [None for _ in self.pumps_list]
 
         ### --- TEMPERATURES --- ###
         temps_frame = tk.Frame(equipment_frame)
@@ -466,7 +466,6 @@ class System2:
         )
 
         # Initiate Classes
-        print('remember to change line self.temp_plc = read_floats_class(....)')
         plc_host_num = "169.254.83.200"
         self.temp_plc = read_floats_class(plc_host_num, 502)  # put the host_num directly in __init__
         self.temp_plc.set_graph_obj(self.g)
@@ -690,19 +689,19 @@ class System2:
             p_ser = Pump.pump_connect(self, self.pump_port_vars[pump_index].get())
             self.pump_sers[pump_index] = p_ser
 
-            b_ser = Balance.balance_connect(
-                self, self.balance_port_vars[pump_index].get()
-            )
-            self.balance_sers[pump_index] = b_ser
+            # b_ser = Balance.balance_connect(
+            #     self, self.balance_port_vars[pump_index].get()
+            # )
+            # self.balance_sers[pump_index] = b_ser
 
-            c = pid_control(
-                b_ser,
-                p_ser,
-                self.pump_type_vars[pump_index].get().upper(),
-                self.pumps_list[pump_index],
-                self.g,
-            )
-            self.pump_pid_classes[pump_index] = c
+            # c = pid_control(
+            #     b_ser,
+            #     p_ser,
+            #     self.pump_type_vars[pump_index].get().upper(),
+            #     self.pumps_list[pump_index],
+            #     self.g,
+            # )
+            # self.pump_pid_classes[pump_index] = c
             c.set_excel_obj(self.excel_obj)
 
         else:  # If already connected
@@ -714,8 +713,8 @@ class System2:
             p_ser = self.pump_sers[pump_index]
             Pump.pump_disconnect(self, p_ser)
 
-            b_ser = self.balance_sers[pump_index]
-            Balance.balance_disconnect(self, b_ser)
+            # b_ser = self.balance_sers[pump_index]
+            # Balance.balance_disconnect(self, b_ser)
 
     def pump_on(self, pump_index):
         self.pump_on_buttons[pump_index].config(bg="pale green")
@@ -730,9 +729,9 @@ class System2:
             elif pump_type == "UI-22":
                 Pump.UI22_pump_command(self, ser, command="G1", value="1")
 
-            c = self.pump_pid_classes[pump_index]
-            if c:
-                c.set_stop(False)
+            # c = self.pump_pid_classes[pump_index]
+            # if c:
+            #     c.set_stop(False)
 
     def pump_off(
             self, pump_index
@@ -743,9 +742,9 @@ class System2:
         if self.pump_connect_vars[pump_index]:  # if connected
             pump_type = self.pump_type_vars[pump_index].get().upper()
 
-            c = self.pump_pid_classes[pump_index]
-            if c:
-                c.set_stop(True)
+            # c = self.pump_pid_classes[pump_index]
+            # if c:
+            #     c.set_stop(True)
 
             ser = self.pump_sers[pump_index]
             if pump_type == "ELDEX":
@@ -769,23 +768,23 @@ class System2:
                 flow_rate = flow_rate.replace(".", "")
                 Pump.UI22_pump_command(self, p_ser, command="S3", value=flow_rate)
 
-            c = self.pump_pid_classes[index]
-            c.set_controller_and_matrix(pump_controller, matrix_lengths[index])
-            c.set_stop(False)
+            # c = self.pump_pid_classes[index]
+            # c.set_controller_and_matrix(pump_controller, matrix_lengths[index])
+            # c.set_stop(False)
 
-            if not self.pump_pid_threads_started[index]:
-                t_pid = threading.Thread(target=c.start)
-                t_pid.daemon = True
-                t_pid.start()
+            # if not self.pump_pid_threads_started[index]:
+            #     t_pid = threading.Thread(target=c.start)
+            #     t_pid.daemon = True
+            #     t_pid.start()
 
-                self.pump_pid_threads_started[index] = True
+            #     self.pump_pid_threads_started[index] = True
 
-    def change_pid_onoff(self, i):
-        c = self.pump_pid_classes[i]
-        if c:
-            c.pid_onoff(self.pid_vars[i].get())
-            if not self.pid_vars[i].get():
-                print("PID control off")
+    # def change_pid_onoff(self, i):
+    #     c = self.pump_pid_classes[i]
+    #     if c:
+    #         c.pid_onoff(self.pid_vars[i].get())
+    #         if not self.pid_vars[i].get():
+    #             print("PID control off")
 
     def pressure_inout_onoff(self, i, boolean):
         if boolean:
@@ -936,11 +935,11 @@ class System2:
         tk.Label(
             pump_frame, text="Pump Port Number", font=("TkDefaultFont", 9, "underline")
         ).grid(row=0, column=2)
-        tk.Label(
-            pump_frame,
-            text="Balance Port Number",
-            font=("TkDefaultFont", 9, "underline"),
-        ).grid(row=0, column=3)
+        # tk.Label(
+        #     pump_frame,
+        #     text="Balance Port Number",
+        #     font=("TkDefaultFont", 9, "underline"),
+        # ).grid(row=0, column=3)
 
         for i, name in enumerate(self.pumps_list):
             tk.Label(pump_frame, text=name).grid(row=i + 1, column=0, padx=5)
@@ -961,15 +960,15 @@ class System2:
             pump_port_entry.grid(row=i + 1, column=2, padx=5)
             self.pump_port_vars[i] = self.pump_port_var
 
-            # balances
-            self.balance_port_var = tk.IntVar()
-            if self.balance_port_vars[i]:
-                self.balance_port_var.set(self.balance_port_vars[i].get())
-            balance_port_entry = tk.Entry(
-                pump_frame, textvariable=self.balance_port_var
-            )
-            balance_port_entry.grid(row=i + 1, column=3, padx=5)
-            self.balance_port_vars[i] = self.balance_port_var
+            # # balances
+            # self.balance_port_var = tk.IntVar()
+            # if self.balance_port_vars[i]:
+            #     self.balance_port_var.set(self.balance_port_vars[i].get())
+            # balance_port_entry = tk.Entry(
+            #     pump_frame, textvariable=self.balance_port_var
+            # )
+            # balance_port_entry.grid(row=i + 1, column=3, padx=5)
+            # self.balance_port_vars[i] = self.balance_port_var
 
         pump_frame.pack(pady=10)
 
@@ -1158,9 +1157,9 @@ class System2:
 
         print("Writing data into excel file...")
         self.excel_obj = excel_file(self.pumps_list, pump_controllers, matrix_lengths)
-        for c in self.pump_pid_classes:
-            if c:
-                c.set_excel_obj(self.excel_obj)
+        # for c in self.pump_pid_classes:
+        #     if c:
+        #         c.set_excel_obj(self.excel_obj)
         t_excel = threading.Thread(target=self.excel_obj.start_file)
         t_excel.daemon = True
         t_excel.start()
@@ -1232,10 +1231,10 @@ class System2:
         # response = ser_out.readline().decode('ascii')
         # print(f'{ser_out.portstr}: {response}')
 
-        # turn on
-        ser_in.write('1H[CR]\r\n'.encode('ascii'))
-        response = ser_out.readline().decode('ascii')
-        print(f'{ser_out.portstr}: {response}')
+        # # turn on
+        # ser_in.write('1H[CR]\r\n'.encode('ascii'))
+        # response = ser_out.readline().decode('ascii')
+        # print(f'{ser_out.portstr}: {response}')
         #
         # # #turn off
         # ser.write('1I[CR]\r\n'.encode('ascii'))
@@ -1263,6 +1262,12 @@ class System2:
         # ser.write('1I[CR]\r\n'.encode('ascii'))
         # response = ser.readline().decode('ascii')
         # print(f'{ser.portstr}: {response}')
+
+
+
+
+
+
         # '''
         # ------------------------------------------
         # Reglo ICC Peristaltic Pump Control Library
@@ -1344,6 +1349,12 @@ class System2:
         #         # the original speed value in a fixed-point notation with three digits before   #
         #         # the decimal point and two digits after, without the decimal separator.        #
         #         #--------------------------------------------------------------------------------
+                ### Change the setting speed to 24 RPM
+                # ser.write((str(3) + 'S002400' + chr(13)).encode())
+                # # Setting speed has a resolution of 0.01 RPM so 24 RPM is assigned as 2400
+                # # Discrete type 3 data has a width of 6 characters with unused digits to the left being zeros --&gt; 002400
+                # read_data = ser.read(ser.in_waiting).decode()
+                # # The pump returns '*' after a successful execution of the command
         #
         #         # Read out speed of a single channel in RPM when in RPM mode
         #     def get_speed(self, channel):
