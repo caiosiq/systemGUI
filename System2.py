@@ -902,16 +902,16 @@ class System2:
         "stirrer" or "pressure regulator"
         """
         if equipment_type == "stirrer":
-            data = list(self.stirrer_entries[index])
+            # data = list(self.stirrer_entries[index])
             reg1 = self.stirrer_reg1_vars[index]
             reg2 = self.stirrer_reg2_vars[index]
-            self.stirrer_plc.write_float(data, reg1, reg2)
+            self.stirrer_plc.write_float(reg1, reg2)
 
         if equipment_type == "pressure regulator":
-            data = list(self.pressure_regulator_entries[index])
+            # data = list(self.pressure_regulator_entries[index])
             reg1 = self.pressure_regulator_reg1_vars[index]
             reg2 = self.pressure_regulator_reg2_vars[index]
-            self.pressure_regulator_plc.write_float(data, reg1, reg2)
+            self.pressure_regulator_plc.write_float(reg1, reg2)
 
     def open_assign(self):
         """
@@ -1216,15 +1216,15 @@ class System2:
             quit()
 
     def test(self):
-        import serial
-        p_in = f'COM{8}'  # put in port number
-        ser_in = serial.Serial(port=p_in, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
-                            bytesize=serial.EIGHTBITS, timeout=1)
-        print("connected to: " + ser_in.portstr)
-        p_out = f'COM{5}'  # put in port number
-        ser_out = serial.Serial(port=p_out, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
-                            bytesize=serial.EIGHTBITS, timeout=1)
-        print("connected to: " + ser_out.portstr)
+        # import serial
+        # p_in = f'COM{8}'  # put in port number
+        # ser_in = serial.Serial(port=p_in, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
+        #                     bytesize=serial.EIGHTBITS, timeout=1)
+        # print("connected to: " + ser_in.portstr)
+        # p_out = f'COM{5}'  # put in port number
+        # ser_out = serial.Serial(port=p_out, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
+        #                     bytesize=serial.EIGHTBITS, timeout=1)
+        # print("connected to: " + ser_out.portstr)
 
         # set flow rate
         # ser_in.write('1M1300-3[CR]\r\n'.encode('ascii'))
@@ -1266,8 +1266,8 @@ class System2:
 
 
 
-
-
+        #
+        #
         # '''
         # ------------------------------------------
         # Reglo ICC Peristaltic Pump Control Library
@@ -1349,12 +1349,13 @@ class System2:
         #         # the original speed value in a fixed-point notation with three digits before   #
         #         # the decimal point and two digits after, without the decimal separator.        #
         #         #--------------------------------------------------------------------------------
-                ### Change the setting speed to 24 RPM
-                # ser.write((str(3) + 'S002400' + chr(13)).encode())
-                # # Setting speed has a resolution of 0.01 RPM so 24 RPM is assigned as 2400
-                # # Discrete type 3 data has a width of 6 characters with unused digits to the left being zeros --&gt; 002400
-                # read_data = ser.read(ser.in_waiting).decode()
-                # # The pump returns '*' after a successful execution of the command
+        #         ## Change the setting speed to 24 RPM
+        #         self.sp.write((str(channel) + f'f{speed_string}' + chr(13)).encode())
+        #         # Setting speed has a resolution of 0.01 RPM so 24 RPM is assigned as 2400
+        #         # Discrete type 3 data has a width of 6 characters with unused digits to the left being zeros --&gt; 002400
+        #         read_data = self.sp.read(self.sp.in_waiting).decode()
+        #         return read_data
+        #         # The pump returns '*' after a successful execution of the command
         #
         #         # Read out speed of a single channel in RPM when in RPM mode
         #     def get_speed(self, channel):
@@ -1382,23 +1383,24 @@ class System2:
         #         self.sp.write(command)
         #         time.sleep(0.1)
         #         return self.sp.read(self.sp.in_waiting).decode()
-        #
-        # # ----------------------------------------------------------------------------#
-        # #   EXAMPLES ON HOW TO USE THE DEFINED CLASS TO CONTROL THE Reglo ICC PUMP   #
-        # # ----------------------------------------------------------------------------#
-        #
-        # ### Initialize the pump with the specified COM port
+        # #
+        # # # ----------------------------------------------------------------------------#
+        # # #   EXAMPLES ON HOW TO USE THE DEFINED CLASS TO CONTROL THE Reglo ICC PUMP   #
+        # # # ----------------------------------------------------------------------------#
+        # #
+        # # ### Initialize the pump with the specified COM port
         # pump = RegloICC('COM8')  # Replace 'COM8' with your actual COM port
-        # # ### Set the operational mode of channel 1 to RPM
-        # pump.set_mode(1, 1)
-        # #
-        # # ### Get the current speed setting of channel 1
-        # # print(pump.get_speed(1))
-        # #
-        # # ### Set the setting speed of channel 1 to 24 RPM
-        # pump.set_speed(1, 1234)
-        # ### Start channel 1
+        # # # ### Set the operational mode of channel 1 to flow rate
+        # # #
+        # # # ### Get the current speed setting of channel 1
         # pump.start_channel(1)
+        # pump.set_mode(1, 1)
+        # print('initial speed:',pump.get_speed(1))
+        # # #
+        # # # ### Set the setting speed of channel 1 to 24 RPM
+        # print('set speed:',pump.set_speed(1, 1234))
+        # ### Start channel 1
+        # print('final speed:', pump.get_speed(1))
         #
         # ### Get the rotation direction of channel 1
         # # print(pump.get_direction(1))
@@ -1410,13 +1412,21 @@ class System2:
         # # print(pump.get_mode(1))
         # #
         # #
-        # # ### Stop channel 1
-        # # pump.stop_channel(1)
-        #
-        # ### Delete the pump object
+        ### Stop channel 1
+        # time.sleep(3)
+        # pump.stop_channel(1)
+
+        ## Delete the pump object
         # del pump
 
+        from pymodbus.client import ModbusTcpClient
+        import time
+        def write_onoff(address_num, boolean):
+            client = ModbusTcpClient(host="169.254.83.200")
+            client.write_coil(address=address_num, value=boolean)
 
-
+        write_onoff(8353, True)
+        time.sleep(1)
+        write_onoff(8353, False)
 
 gui = System2()
