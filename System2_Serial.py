@@ -55,7 +55,7 @@ class Balance:
 
 
 class PLC:
-    def __init__(self, host_num, port_num = None) -> None:
+    def __init__(self, host_num, port_num=None) -> None:
         if port_num:
             self.client = ModbusTcpClient(host=host_num, port=port_num)
         else:
@@ -70,7 +70,8 @@ class PLC:
     def disconnect(self):
         self.client.close()
         print("Disconnected")
-    
+
+
 class read_floats_class(PLC):
     def set_graph_obj(self, graph_obj):
         self.graph_obj = graph_obj
@@ -106,28 +107,19 @@ class read_floats_class(PLC):
             self.graph_obj.update_dict(data_type, name, current_value)
             # excel_obj.write[data, data]
             sleep(.5)
-        
+
+
 class one_bit_class(PLC):
     def write_onoff(self, address_num, boolean):
-        self.client.write_coil(address=address_num, value=boolean)
+        address_num = address_num.get()
+        self.client.write_coil(address=int(address_num), value=boolean)
+
 
 class write_floats_class(PLC):
-    def write_float(self, data, reg1, reg2=None):
-        data = [data]
-        address = 0
-
-        for i in range(10):
-            # print('-' * 5, 'Cycle ', i, '-' * 30)
-            # sleep(1.0)  # why sleep
-
-            # increment data by one
-            for i, d in enumerate(data):
-                data[i] = d + 1
-
-            # write holding registers
-            # print('Write:', data)
-            builder = BinaryPayloadBuilder(byteorder=Endian.Big, wordorder=Endian.Little)
-            for d in data:
-                builder.add_16bit_int(int(d))
-            payload = builder.build()
-            self.client.write_registers(reg1, payload, skip_encode=True, unit=address)  # only reg 1?
+    def write_float(self, reg1, reg2):
+        reg1, reg2 = reg1.get(), reg2.get()
+        builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.LITTLE)
+        builder.add_32bit_float(12.12)
+        payload = builder.build()
+        result = self.client.write_registers(reg1, payload, skip_encode=True)
+        print('here')
