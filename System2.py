@@ -350,10 +350,9 @@ class System2:
 
         address = self.register_dictionary[equipment_type][equipment_name][0].get()
         plc_object.write_onoff(address, boolean)
-        
 
     def create_assignment_section(self, title, headers, items):
-        frame = tk.Frame(self.assign_page)
+        frame = tk.Frame(self.scrollable_frame)
         tk.Label(frame, text=title, font=("Arial", 12, "bold")).pack(pady=5)
 
         table_frame = tk.Frame(frame)
@@ -372,10 +371,27 @@ class System2:
 
     def open_assign(self):
         self.assign_page = tk.Toplevel(self.root)
-        tk.Label(self.assign_page, text="Assign Equipment", font=("Arial", 12, "bold")).pack(pady=10)
+        self.assign_page.title("Assign Equipment")
+
+        # Create a canvas with scrollbars
+        canvas = tk.Canvas(self.assign_page)
+        scrollbar_y = tk.Scrollbar(self.assign_page, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = tk.Frame(canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar_y.set)
+
+        tk.Label(self.scrollable_frame, text="Assign Equipment", font=("Arial", 14, "bold")).pack(pady=10)
         
-        tk.Label(self.assign_page, text="Assign Pump Types and Ports", font=("Arial", 12, "bold")).pack(pady=5)
-        pump_frame = tk.Frame(self.assign_page)
+        tk.Label(self.scrollable_frame, text="Assign Pump Types and Ports", font=("Arial", 12, "bold")).pack(pady=5)
+        pump_frame = tk.Frame(self.scrollable_frame)
 
         tk.Label(pump_frame, text="Pump Name", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=0)
         tk.Label(pump_frame, text="Pump Type", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=1)
@@ -437,6 +453,9 @@ class System2:
             headers=["Name", "Register 1", "Register 2"],
             items=self.stirrers_list
         )
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar_y.pack(side="right", fill="y")
 
     # Other functions
     def exit_shortcut(self, event):
