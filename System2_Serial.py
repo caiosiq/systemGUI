@@ -5,38 +5,92 @@ import struct
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadBuilder
 
+# https://blog.darwin-microfluidics.com/how-to-control-the-reglo-icc-pump-using-python-and-matlab/
 class Pump:
-    def pump_connect(self, port_number):
-        p = f'COM{port_number}'
-        ser = serial.Serial(port=p, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
-                            bytesize=serial.EIGHTBITS, timeout=1)
-        print("connected to: " + ser.portstr)
-        return ser
+    """
+    Reglo ICC Pump Control Library
+    """
+    def __init__(self, COM):
+        self.COM = COM
+        self.sp = serial.Serial(
+            self.COM,
+            9600,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
+        )
+        return self.sp
 
-    def pump_disconnect(self, ser):
-        ser.close()
-        print("disconnected from: " + ser.portstr)
+    def __del__(self):
+        self.sp.close()
 
-    def eldex_pump_command(self, ser, command, value=''):
-        # Format the command string and encode it to bytes
-        command_str = f'{command}{value}\r\n'
-        ser.write(command_str.encode('ascii'))
+    def start_channel(self, channel):
+        command = f"{channel}H\r".encode()
+        self.sp.write(command)
+        sleep(0.1)
+        print(self.sp.read(self.sp.in_waiting).decode())
 
-        # Read and print the response from the pump
-        response = ser.readline().decode('ascii')
-        print(f'{ser.portstr}: {response}')
+    def stop_channel(self, channel):
+        command = f"{channel}I\r".encode()
+        self.sp.write(command)
+        sleep(0.1)
+        print(self.sp.read(self.sp.in_waiting).decode())
 
-    def UI22_pump_command(self, ser, command, address='01', value=''):
-        # Format the command string and encode it to bytes
-        command_str = f';{address},{command},{value}\r\n'
-        ser.write(command_str.encode('ascii'))
+    # Set rotation direction
+    def set_direction(self, channel, direction):
+        if direction == 1:
+            command = f"{channel}K\r".encode()  # counter-clockwise
+        else:
+            command = f"{channel}J\r".encode()  # clockwise
+        self.sp.write(command)
+        sleep(0.1)
+        print(self.sp.read(self.sp.in_waiting).decode())
 
-        # Read and print the response from the pump
-        response = ser.readline().decode('ascii')
-        print(f'{ser.portstr}: {response}')
+    # Get rotation direction
+    def get_direction(self, channel):
+        command = f"{channel}xD\r".encode()
+        self.sp.write(command)
+        sleep(0.1)
+        return self.sp.read(self.sp.in_waiting).decode()
 
-    def reglo_pump_command(self, ser, addr, command, data_parameter):
-        pass
+    def set_speed(self, channel: int, speed: float) -> str:
+                
+        # Convert speed to required format (3 digits before decimal, 2 after)
+        # Multiply by 100 to handle 2 decimal places without floating point issues
+        speed_int = int(round(speed * 100))
+        
+        # Format as 5 digits (3 before decimal, 2 after)
+        # For example: 24.00 RPM becomes "02400"
+        speed_string = f"{speed_int:05d}"
+
+        command = f"{channel}f{speed_string}\r"
+        self.sp.write(command.encode())
+        response = self.sp.read(self.sp.in_waiting).decode()
+        sleep(0.1)
+        print(response)
+
+    def get_speed(self, channel):
+        command = f"{channel}S\r".encode()
+        self.sp.write(command)
+        sleep(0.1)
+        return self.sp.read(self.sp.in_waiting).decode()
+
+    def set_mode(self, channel, mode):
+        if mode == 0:
+            command = f"{channel}L\r".encode()  # RPM mode
+        elif mode == 1:
+            command = f"{channel}M\r".encode()  # Flow rate mode
+        else:
+            command = f"{channel}G\r".encode()  # Volume (over time) mode
+        self.sp.write(command)
+        sleep(0.1)
+        print(self.sp.read(self.sp.in_waiting).decode())
+
+    def get_mode(self, channel):
+        command = f"{channel}xM\r".encode()
+        self.sp.write(command)
+        sleep(0.1)
+        return self.sp.read(self.sp.in_waiting).decode()
 
 class PLC:
     def __init__(self, host_num, port_num=None) -> None:

@@ -4,10 +4,11 @@ from System2_Serial import Pump, read_floats_class, one_bit_class, write_floats_
 
 class PumpControl:
     """Encapsulates all UI elements for a pump."""
-    def __init__(self, connect, on, off, flow_var):
+    def __init__(self, connect, on_button, off_button, channel_var, flow_var):
         self.connect = connect  # Connect button
-        self.on = on  # On button
-        self.off = off  # Off button
+        self.on_button = on_button  # On button
+        self.off_button = off_button  # Off button
+        self.channel_var = channel_var  # Channel number input variable
         self.flow_var = flow_var  # Flow rate input variable
 
 class System2:
@@ -108,7 +109,7 @@ class System2:
         tk.Label(frame, text="Pumps", font=("Arial", 16, "underline")).grid(sticky="w", row=0, column=0)
 
         # Column headers
-        headers = ["Connect", "On", "Off", "Flow Rate", "Set Flow Rate"]
+        headers = ["Connect", "On", "Off", "Channel Number", "Flow Rate", "Set Flow Rate"]
         for col, text in enumerate(headers, start=1):
             tk.Label(frame, text=text, font=("Arial", 12, "bold")).grid(row=1, column=col)
 
@@ -119,19 +120,22 @@ class System2:
             connect_btn = tk.Button(frame, text="Disconnected", width=12, command=lambda i=i: self.pump_connect(i))
             on_btn = tk.Button(frame, text="On", width=7, command=lambda i=i: self.pump_on(i))
             off_btn = tk.Button(frame, text="Off", width=7, command=lambda i=i: self.pump_off(i))
+            channel_var = tk.StringVar()
+            channel_entry = tk.Entry(frame, textvariable=channel_var, width=5)
             flow_var = tk.StringVar()
             flow_entry = tk.Entry(frame, textvariable=flow_var, width=15)
             set_flow_btn = tk.Button(frame, text="Set", width=5, command=lambda i=i: self.pump_set_flow_rate(i))
 
             # Store elements in the dictionary
-            self.pump_controls[i] = PumpControl(connect_btn, on_btn, off_btn, flow_var)
+            self.pump_controls[i] = PumpControl(connect_btn, on_btn, off_btn, channel_var, flow_var)
 
             # Place elements in the grid
             connect_btn.grid(row=i + 2, column=1, padx=10)
             on_btn.grid(row=i + 2, column=2, padx=10)
             off_btn.grid(row=i + 2, column=3, padx=10)
-            flow_entry.grid(row=i + 2, column=4, padx=10)
-            set_flow_btn.grid(row=i + 2, column=5)
+            channel_entry.grid(row=i + 2, column=4, padx=10)
+            flow_entry.grid(row=i + 2, column=5, padx=10)
+            set_flow_btn.grid(row=i + 2, column=6)
 
         frame.pack(anchor="nw", padx=15, pady=15)
 
@@ -156,14 +160,14 @@ class System2:
             self.pump_connect_vars[pump_index] = True
             self.update_button_colors(pump_index, "connected")
 
-            p_ser = Pump.pump_connect(self, self.pump_port_vars[pump_index].get())
-            self.pump_sers[pump_index] = p_ser
+            pump_ser = Pump(self.pump_port_vars[pump_index].get())
+            self.pump_sers[pump_index] = pump_ser
         else:  # If already connected
             self.pump_connect_vars[pump_index] = False
             self.update_button_colors(pump_index, "disconnected")
 
-            p_ser = self.pump_sers[pump_index]
-            Pump.pump_disconnect(self, p_ser)
+            pump_ser = self.pump_sers[pump_index]
+            Pump.pump_disconnect(self, pump_ser)
 
     def pump_on(self, pump_index):
         """Turns on the pump if connected."""
@@ -189,24 +193,25 @@ class System2:
             return  # Ignore if not connected
 
         pump = self.pump_controls[pump_index]
+        channel_num = float(pump.channel_var.get())
         flow_rate = float(pump.flow_var.get())
         formatted_flow_rate = f"{flow_rate:06.3f}"
 
         pump_type = self.pump_type_vars[pump_index].get().upper()
         self.send_pump_command(pump_index, "SF" if pump_type == "ELDEX" else "S3", value=formatted_flow_rate.replace(".", ""))
 
-    def send_pump_command(self, pump_index, command, value=None):
-        """Sends a command to the specified pump."""
-        if not self.pump_connect_vars[pump_index]:
-            return  # Ignore if not connected
+    # def send_pump_command(self, pump_index, command, value=None):
+    #     """Sends a command to the specified pump."""
+    #     if not self.pump_connect_vars[pump_index]:
+    #         return  # Ignore if not connected
 
-        ser = self.pump_sers[pump_index]
-        if value is not None:
-            Pump.eldex_pump_command(self, ser, command=command, value=value) if self.pump_type_vars[pump_index].get().upper() == "ELDEX" \
-                else Pump.UI22_pump_command(self, ser, command=command, value=value)
-        else:
-            Pump.eldex_pump_command(self, ser, command=command) if self.pump_type_vars[pump_index].get().upper() == "ELDEX" \
-                else Pump.UI22_pump_command(self, ser, command=command)
+    #     ser = self.pump_sers[pump_index]
+    #     if value is not None:
+    #         Pump.eldex_pump_command(self, ser, command=command, value=value) if self.pump_type_vars[pump_index].get().upper() == "ELDEX" \
+    #             else Pump.UI22_pump_command(self, ser, command=command, value=value)
+    #     else:
+    #         Pump.eldex_pump_command(self, ser, command=command) if self.pump_type_vars[pump_index].get().upper() == "ELDEX" \
+    #             else Pump.UI22_pump_command(self, ser, command=command)
 
     # other
     def create_equipment_section(self, title, items, connect_command, display_current=False, entry=False, onoff_buttons=False):
@@ -394,26 +399,16 @@ class System2:
         pump_frame = tk.Frame(self.scrollable_frame)
 
         tk.Label(pump_frame, text="Pump Name", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=0)
-        tk.Label(pump_frame, text="Pump Type", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=1)
-        tk.Label(pump_frame, text="Pump Port Number", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=2)
+        tk.Label(pump_frame, text="Pump Port Number", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=1)
 
         for i, name in enumerate(self.pumps_list):
             tk.Label(pump_frame, text=name).grid(row=i + 1, column=0, padx=5)
-
-            self.pump_type_var = tk.StringVar()
-            if self.pump_type_vars[
-                i
-            ]:  # populate assign page with previously assigned
-                self.pump_type_var.set(self.pump_type_vars[i].get())
-            pump_type_entry = tk.Entry(pump_frame, textvariable=self.pump_type_var)
-            pump_type_entry.grid(row=i + 1, column=1, padx=5)
-            self.pump_type_vars[i] = self.pump_type_var
 
             self.pump_port_var = tk.IntVar()
             if self.pump_port_vars[i]:
                 self.pump_port_var.set(self.pump_port_vars[i].get())
             pump_port_entry = tk.Entry(pump_frame, textvariable=self.pump_port_var)
-            pump_port_entry.grid(row=i + 1, column=2, padx=5)
+            pump_port_entry.grid(row=i + 1, column=1, padx=5)
             self.pump_port_vars[i] = self.pump_port_var
 
         pump_frame.pack(pady=10)
