@@ -11,6 +11,10 @@ class PumpControl:
         self.channel_var = channel_var  # Channel number input variable
         self.flow_var = flow_var  # Flow rate input variable
 
+    def set_serial_obj(self, serial_obj):
+        print('Setting serial object')
+        self.serial_obj = serial_obj
+
 class System2:
     def __init__(self):
         self.root = tk.Tk()
@@ -60,8 +64,6 @@ class System2:
         ### --- PUMPS --- ###
         self.pumps_list = ["Pump 1", "Pump 2", "Pump 3", "Pump 4"]
         self.pump_connect_vars = [False] * len(self.pumps_list)
-        self.pump_sers = [None] * len(self.pumps_list)
-        self.pump_type_vars = [None] * len(self.pumps_list)
         self.pump_port_vars = [None] * len(self.pumps_list)
         self.pump_controls = {}  # Dictionary to store UI elements
         self.create_pump_ui()
@@ -144,11 +146,11 @@ class System2:
         pump = self.pump_controls[pump_index]
 
         if state == "on":
-            pump.on.config(bg="pale green")
-            pump.off.config(bg="SystemButtonFace")
+            pump.on_button.config(bg="pale green")
+            pump.off_button.config(bg="SystemButtonFace")
         elif state == "off":
-            pump.off.config(bg="IndianRed1")
-            pump.on.config(bg="SystemButtonFace")
+            pump.off_button.config(bg="IndianRed1")
+            pump.on_button.config(bg="SystemButtonFace")
         elif state == "connected":
             pump.connect.config(bg="LightSkyBlue1", text="Connected")
         elif state == "disconnected":
@@ -156,18 +158,26 @@ class System2:
 
     def pump_connect(self, pump_index):
         """Handles connecting/disconnecting a pump."""
+        pump = self.pump_controls[pump_index]
+
         if not self.pump_connect_vars[pump_index]:  # If not connected
+            if not self.pump_port_vars[pump_index]:
+                print("Please enter a port number.")
+                return
+            
             self.pump_connect_vars[pump_index] = True
             self.update_button_colors(pump_index, "connected")
 
-            pump_ser = Pump(self.pump_port_vars[pump_index].get())
-            self.pump_sers[pump_index] = pump_ser
+            com_number = str(self.pump_port_vars[pump_index].get())
+            pump_ser = Pump(com_number)
+            pump.set_serial_obj(pump_ser)
+
         else:  # If already connected
             self.pump_connect_vars[pump_index] = False
             self.update_button_colors(pump_index, "disconnected")
 
-            pump_ser = self.pump_sers[pump_index]
-            Pump.pump_disconnect(self, pump_ser)
+            pump_ser = pump.serial_obj
+            del pump_ser # equivalent to pump_ser.close()
 
     def pump_on(self, pump_index):
         """Turns on the pump if connected."""
@@ -175,8 +185,11 @@ class System2:
             return  # Ignore if pump is not connected
 
         self.update_button_colors(pump_index, "on")
-        pump_type = self.pump_type_vars[pump_index].get().upper()
-        self.send_pump_command(pump_index, "RU" if pump_type == "ELDEX" else "G1", value="1")
+        pump = self.pump_controls[pump_index]
+        pump_ser = pump.serial_obj
+        channel_number = int(pump.channel_var.get())
+
+        pump_ser.start_channel(channel_number)
 
     def pump_off(self, pump_index):
         """Turns off the pump if connected."""
@@ -184,8 +197,11 @@ class System2:
             return  # Ignore if pump is not connected
 
         self.update_button_colors(pump_index, "off")
-        pump_type = self.pump_type_vars[pump_index].get().upper()
-        self.send_pump_command(pump_index, "ST" if pump_type == "ELDEX" else "G1", value="0")
+        pump = self.pump_controls[pump_index]
+        pump_ser = pump.serial_obj
+        channel_number = int(pump.channel_var.get())
+
+        pump_ser.stop_channel(channel_number)
 
     def pump_set_flow_rate(self, pump_index):
         """Sets the flow rate for the pump."""
@@ -193,25 +209,12 @@ class System2:
             return  # Ignore if not connected
 
         pump = self.pump_controls[pump_index]
-        channel_num = float(pump.channel_var.get())
+        pump_ser = pump.serial_obj
+        channel_num = int(pump.channel_var.get())
         flow_rate = float(pump.flow_var.get())
-        formatted_flow_rate = f"{flow_rate:06.3f}"
 
-        pump_type = self.pump_type_vars[pump_index].get().upper()
-        self.send_pump_command(pump_index, "SF" if pump_type == "ELDEX" else "S3", value=formatted_flow_rate.replace(".", ""))
-
-    # def send_pump_command(self, pump_index, command, value=None):
-    #     """Sends a command to the specified pump."""
-    #     if not self.pump_connect_vars[pump_index]:
-    #         return  # Ignore if not connected
-
-    #     ser = self.pump_sers[pump_index]
-    #     if value is not None:
-    #         Pump.eldex_pump_command(self, ser, command=command, value=value) if self.pump_type_vars[pump_index].get().upper() == "ELDEX" \
-    #             else Pump.UI22_pump_command(self, ser, command=command, value=value)
-    #     else:
-    #         Pump.eldex_pump_command(self, ser, command=command) if self.pump_type_vars[pump_index].get().upper() == "ELDEX" \
-    #             else Pump.UI22_pump_command(self, ser, command=command)
+        pump_ser.set_mode(channel_num, 1)  # Set to flow rate mode
+        pump_ser.set_speed(channel_num, flow_rate)
 
     # other
     def create_equipment_section(self, title, items, connect_command, display_current=False, entry=False, onoff_buttons=False):
