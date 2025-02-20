@@ -241,8 +241,7 @@ class System2:
                 entry_field = tk.Entry(frame, textvariable=var)
                 entry_field.grid(row=i + 1, column=1, padx=15, pady=5)
                 self.equipment_data[title][name] = var
-                tk.Button(frame, text="Enter", command=lambda t=title, n=name, v = float(self.equipment_data[title][name].get()):
-                           self.write_float_values(t, n, v)).grid(row=i + 1, column=2)
+                tk.Button(frame, text="Enter", command=lambda t=title, n=name: self.write_float_values(t, n)).grid(row=i + 1, column=2)
                 self.register_dictionary[title][name] = [tk.IntVar(), tk.IntVar()]
                 
             if onoff_buttons: # Pressure in/outs and valves
@@ -297,7 +296,7 @@ class System2:
                 plc.reading_onoff(True)
                 self.read_float_values(plc_object, data_type)
         else:  # If connected, disconnect
-            self.connect_dictionary["vars"][device_name] = 2
+            self.connect_dictionary["vars"][device_name] = 0
             connect_button.config(bg="SystemButtonFace", text="Connect")
             if read_float:
                 plc.reading_onoff(False)
@@ -334,7 +333,7 @@ class System2:
             t.daemon = True
             t.start()
 
-    def write_float_values(self, equipment_type, equipment_name, value):
+    def write_float_values(self, equipment_type, equipment_name):
         """
         Function to write float values to PLC.
         equipment type will be "Pressure Regulators" or "Stirrers"
@@ -345,6 +344,8 @@ class System2:
             plc_object = self.stirrer_plc
 
         reg1, reg2 = self.register_dictionary[equipment_type][equipment_name][0].get(), self.register_dictionary[equipment_type][equipment_name][1].get()
+        print(reg1, reg2)
+        value = float(self.equipment_data[equipment_type][equipment_name].get())
         plc_object.write_float(reg1, reg2, value)
     
     def toggle_onoff(self, equipment_type, equipment_name, boolean):
