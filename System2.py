@@ -1,6 +1,6 @@
 import tkinter as tk
 import threading
-from System2_Serial import Pump, read_floats_class, one_bit_class, write_floats_class
+from System2_Serial import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC
 
 class PumpControl:
     """Encapsulates all UI elements for a pump."""
@@ -87,14 +87,14 @@ class System2:
 
         # Initiate Classes
         plc_host_num = "169.254.83.200"
-        self.temperature_plc = read_floats_class(plc_host_num, 502)
-        self.pressure_transmitter_plc = read_floats_class(plc_host_num, 502)
+        self.temperature_plc = ReadFloatsPLC(plc_host_num, 502)
+        self.pressure_transmitter_plc = ReadFloatsPLC(plc_host_num, 502)
 
-        self.pressure_inout_plc = one_bit_class(plc_host_num)
-        self.valve_plc = one_bit_class(plc_host_num)
+        self.pressure_inout_plc = OneBitClass(plc_host_num)
+        self.valve_plc = OneBitClass(plc_host_num)
 
-        self.stirrer_plc = write_floats_class(plc_host_num)
-        self.pressure_regulator_plc = write_floats_class(plc_host_num)
+        self.stirrer_plc = WriteFloatsPLC(plc_host_num)
+        self.pressure_regulator_plc = WriteFloatsPLC(plc_host_num)
 
         gui_frame.pack()
 
@@ -241,7 +241,8 @@ class System2:
                 entry_field = tk.Entry(frame, textvariable=var)
                 entry_field.grid(row=i + 1, column=1, padx=15, pady=5)
                 self.equipment_data[title][name] = var
-                tk.Button(frame, text="Enter", command=lambda t=title, n=name: self.write_float_values(t, n)).grid(row=i + 1, column=2)
+                tk.Button(frame, text="Enter", command=lambda t=title, n=name, v = float(self.equipment_data[title][name].get()):
+                           self.write_float_values(t, n, v)).grid(row=i + 1, column=2)
                 self.register_dictionary[title][name] = [tk.IntVar(), tk.IntVar()]
                 
             if onoff_buttons: # Pressure in/outs and valves
@@ -333,7 +334,7 @@ class System2:
             t.daemon = True
             t.start()
 
-    def write_float_values(self, equipment_type, equipment_name):
+    def write_float_values(self, equipment_type, equipment_name, value):
         """
         Function to write float values to PLC.
         equipment type will be "Pressure Regulators" or "Stirrers"
@@ -344,7 +345,7 @@ class System2:
             plc_object = self.stirrer_plc
 
         reg1, reg2 = self.register_dictionary[equipment_type][equipment_name][0].get(), self.register_dictionary[equipment_type][equipment_name][1].get()
-        plc_object.write_float(reg1, reg2)
+        plc_object.write_float(reg1, reg2, value)
     
     def toggle_onoff(self, equipment_type, equipment_name, boolean):
         """

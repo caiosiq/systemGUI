@@ -110,7 +110,7 @@ class PLC:
         print("Disconnected")
 
 
-class read_floats_class(PLC):
+class ReadFloatsPLC(PLC):
     def reading_onoff(self, boolean):
         self.reading = boolean
 
@@ -125,15 +125,8 @@ class read_floats_class(PLC):
         registers are inputted,
         """
         while self.reading:
-            # r2 = None
             r1 = self.client.read_holding_registers(reg1).registers[0]
-            # if reg2:
-            #     r2 = self.client.read_holding_registers(reg2).registers[0]
 
-            # if r2:
-            #     current_value = struct.unpack('f', struct.pack('<HH', int(r1), int(r2)))[0]
-            # else:
-                # current_value = struct.unpack('f', struct.pack('<HH', int(r1)))[0]
             current_value = struct.unpack('f', struct.pack('<HH', int(r1)))[0]
             current_value = round(current_value, 3)
 
@@ -141,16 +134,27 @@ class read_floats_class(PLC):
             sleep(.5)
 
 
-class one_bit_class(PLC):
+class OneBitClass(PLC):
     def write_onoff(self, address_num, boolean):
         self.client.write_coil(address=int(address_num), value=boolean)
 
 
-class write_floats_class(PLC):
-    def write_float(self, reg1, reg2):
-        builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.LITTLE)
-        builder.add_32bit_float(12.12)
-        payload = builder.build()
-        # result = self.client.write_registers(reg1, payload, skip_encode=True)
-        result = self.client.write_registers(reg1, payload)
-        print(result)
+class WriteFloatsPLC(PLC):
+    def write_float(self, reg1, reg2, value): # reg2 is automatically reg1 + 1 in the code
+        try:
+            builder = BinaryPayloadBuilder(byteorder=Endian.LITTLE, wordorder=Endian.LITTLE)
+            builder.add_32bit_float(value)
+            payload = builder.to_registers()  # Converts to register values instead of raw bytes
+
+            print(f"Writing value: {value} to registers {reg1}, {reg1+1}")
+            print(f"Payload: {payload}")
+
+            result = self.client.write_registers(reg1, payload)
+
+            if result.isError():
+                print(f"Error writing float to registers {reg1}, {reg1+1}: {result}")
+            else:
+                print(f"Successfully wrote {value} to registers {reg1}, {reg1+1}")
+
+        except Exception as e:
+            print(f"Exception in write_float: {e}")
