@@ -62,15 +62,23 @@ class System2:
         self.equipment_frame = tk.Frame(gui_frame)
 
         ### --- PUMPS --- ###
-        self.pumps_list = ["Pump 1", "Pump 2", "Pump 3", "Pump 4"]
+        self.pumps_list = ["Pump 1"]
         self.pump_connect_vars = [False] * len(self.pumps_list)
         self.pump_port_vars = [None] * len(self.pumps_list)
         self.pump_controls = {}  # Dictionary to store UI elements
         self.create_pump_ui()
 
-        self.equipment_data = {} # Maps equipment type to a dictionary that maps a specific equipment to either the current_label for temp and pressure transmitters, or the current value variable for pressure regulator and stirrer
-        self.connect_dictionary = {"buttons": {}, "vars": {}} # Maps "buttons" or "vars" to a dicitonary that equipment name to variable, variable tracks if that equipment is connected (1) or not (0)
-        self.register_dictionary = {} # Maps equipment type to a dictionary that maps specific equipment to a list of register values (i.e. [2,4] where 2 is reg1 and 4 is reg2)
+        # Maps equipment type to a dictionary that maps a specific equipment to either the current_label
+        # for temp and pressure transmitters, or the current value variable for pressure regulator and stirrer
+        self.equipment_data = {}
+
+        # Maps "buttons" or "vars" to a dicitonary that equipment name to variable, 
+        # variable tracks if that equipment is connected (1) or not (0)
+        self.connect_dictionary = {"buttons": {}, "vars": {}}
+
+        # Maps equipment type to a dictionary that maps specific equipment to a list of register values 
+        # (i.e. [2,4] where 2 is reg1 and 4 is reg2)
+        self.register_dictionary = {}
 
         self.create_temperatures_section()
         self.create_pressure_transmitter_section()
@@ -78,6 +86,7 @@ class System2:
         self.create_pressure_inout_section()
         self.create_valves_section()
         self.create_stirrer_section()
+        self.create_drum_section()
 
         # Create the assign button
         enter_button = tk.Button(self.root, text="Assign and Read Data", command=self.open_assign)
@@ -92,6 +101,7 @@ class System2:
 
         self.pressure_inout_plc = OneBitClass(plc_host_num)
         self.valve_plc = OneBitClass(plc_host_num)
+        self.drum_plc = OneBitClass(plc_host_num)
 
         self.stirrer_plc = WriteFloatsPLC(plc_host_num)
         self.pressure_regulator_plc = WriteFloatsPLC(plc_host_num)
@@ -220,12 +230,8 @@ class System2:
     def create_equipment_section(self, title, items, connect_command, display_current=False, entry=False, onoff_buttons=False):
         frame = tk.Frame(self.equipment_frame)
         tk.Label(self.equipment_frame, text=title, font=("Arial", 16, "underline")).pack(anchor="nw", padx=15, pady=(10, 0))
-        button = tk.Button(frame, text="Connect", font=("Arial", 12, "bold"), width=12, command=connect_command)
-        button.grid(row=0, column=0)
         if display_current or entry:
             self.equipment_data[title] = {}
-        self.connect_dictionary["buttons"][title] = button
-        self.connect_dictionary["vars"][title] = 0
         self.register_dictionary[title] = {}
         
         for i, name in enumerate(items):
@@ -235,6 +241,12 @@ class System2:
                 current_label.grid(row=i + 1, column=1, padx=15)
                 self.equipment_data[title][name] = current_label
                 self.register_dictionary[title][name] = [tk.IntVar(), tk.IntVar()]
+
+                # connnect button for these two equipments
+                connect_button = tk.Button(frame, text="Connect", font=("Arial", 12, "bold"), width=12, command=connect_command)
+                connect_button.grid(row=0, column=0)
+                self.connect_dictionary["buttons"][title] = connect_button
+                self.connect_dictionary["vars"][title] = 0
 
             if entry: # Pressure regulators and stirrers
                 var = tk.StringVar(value="0")
@@ -253,7 +265,7 @@ class System2:
         frame.pack(anchor="nw", padx=15)
 
     def create_temperatures_section(self):
-        self.temperatures_list = ["Temperature 1", "Temperature 2"]
+        self.temperatures_list = ["Temperature 1", "Temperature 2", "Temperature 3"]
         self.create_equipment_section("Temperatures", self.temperatures_list, self.temperature_connect, display_current=True)
         
     def create_pressure_transmitter_section(self):
@@ -275,6 +287,10 @@ class System2:
     def create_stirrer_section(self):
         self.stirrers_list = ["10mL Stirrer", "5mL Stirrer", "40mL Stirrer"]
         self.create_equipment_section("Stirrers", self.stirrers_list, self.stirrer_connect, entry=True)
+    
+    def create_drum_section(self):
+        self.drums_list = ["Drum 1"]
+        self.create_equipment_section("Drums", self.drums_list, self.drum_connect, onoff_buttons=True)
 
     def toggle_connection(self, device_name, plc, read_float=False, plc_object=None, data_type = None):
         """
@@ -321,6 +337,9 @@ class System2:
     def stirrer_connect(self):
         self.toggle_connection("Stirrers", self.stirrer_plc)
 
+    def drum_connect(self):
+        self.toggle_connection("Drums", self.drum_plc)
+
     def read_float_values(self, plc_object, data_type):
         """
         For PLC equipment that reads float values
@@ -356,6 +375,8 @@ class System2:
             plc_object = self.pressure_inout_plc
         elif equipment_type == "Valves":
             plc_object = self.valve_plc
+        elif equipment_type == "Drums":
+            plc_object = self.drum_plc
 
         address = self.register_dictionary[equipment_type][equipment_name][0].get()
         plc_object.write_onoff(address, boolean)
@@ -424,34 +445,40 @@ class System2:
         )
 
         self.create_assignment_section(
-            title="Pressure In/Outs",
-            headers=["Name", "Address"],
-            items=self.pressure_inouts_list
-        )
-
-        self.create_assignment_section(
-            title="Valves",
-            headers=["Name", "Address"],
-            items=self.valves_list
-        )
-
-        self.create_assignment_section(
-            title="Pressure Regulators",
-            headers=["Name", "Register 1", "Register 2"],
-            items=self.pressure_regulators_list
-        )
-
-        self.create_assignment_section(
             title="Pressure Transmitters",
             headers=["Name", "Register 1", "Register 2"],
             items=self.pressure_transmitters_list
         )
 
-        self.create_assignment_section(
-            title="Stirrers",
-            headers=["Name", "Register 1", "Register 2"],
-            items=self.stirrers_list
-        )
+        # self.create_assignment_section(
+        #     title="Pressure Regulators",
+        #     headers=["Name", "Register 1"],
+        #     items=self.pressure_regulators_list
+        # )
+
+        # self.create_assignment_section(
+        #     title="Pressure In/Outs",
+        #     headers=["Name", "Address"],
+        #     items=self.pressure_inouts_list
+        # )
+
+        # self.create_assignment_section(
+        #     title="Valves",
+        #     headers=["Name", "Address"],
+        #     items=self.valves_list
+        # )
+
+        # self.create_assignment_section(
+        #     title="Stirrers",
+        #     headers=["Name", "Register 1"],
+        #     items=self.stirrers_list
+        # )
+
+        # self.create_assignment_section(
+        #     title="Drums",
+        #     headers=["Name", "Register 1"],
+        #     items=self.drums_list
+        # )
 
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar_y.pack(side="right", fill="y")
