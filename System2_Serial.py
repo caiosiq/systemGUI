@@ -114,7 +114,7 @@ class ReadFloatsPLC(PLC):
     def reading_onoff(self, boolean):
         self.reading = boolean
 
-    def read_float(self, label, reg1, reg2):
+    def read_float(self, label, reg1):
         """
         Inputs in two registers. The second register is optional.
 
@@ -140,9 +140,10 @@ class OneBitClass(PLC):
 
 
 class WriteFloatsPLC(PLC):
-    def write_float(self, reg1, reg2, value): # reg2 is automatically reg1 + 1 in the code
+    def write_float(self, reg1, value): # reg2 is automatically reg1 + 1 in the code
         try:
-            builder = BinaryPayloadBuilder(byteorder=Endian.LITTLE, wordorder=Endian.LITTLE)
+            # builder = BinaryPayloadBuilder(byteorder=Endian.LITTLE, wordorder=Endian.LITTLE)
+            builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
             builder.add_32bit_float(value)
             payload = builder.to_registers()  # Converts to register values instead of raw bytes
 

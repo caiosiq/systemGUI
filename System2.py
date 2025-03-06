@@ -76,8 +76,7 @@ class System2:
         # variable tracks if that equipment is connected (1) or not (0)
         self.connect_dictionary = {"buttons": {}, "vars": {}}
 
-        # Maps equipment type to a dictionary that maps specific equipment to a list of register values 
-        # (i.e. [2,4] where 2 is reg1 and 4 is reg2)
+        # Maps equipment type to a dictionary that maps specific equipment number to a register value
         self.register_dictionary = {}
 
         self.create_temperatures_section()
@@ -240,7 +239,7 @@ class System2:
                 current_label = tk.Label(frame, text=None, bg="white", borderwidth=1, relief="raised", width=10)
                 current_label.grid(row=i + 1, column=1, padx=15)
                 self.equipment_data[title][name] = current_label
-                self.register_dictionary[title][name] = [tk.IntVar(), tk.IntVar()]
+                self.register_dictionary[title][name] = tk.IntVar()
 
                 # connnect button for these two equipments
                 connect_button = tk.Button(frame, text="Connect", font=("Arial", 12, "bold"), width=12, command=connect_command)
@@ -255,12 +254,12 @@ class System2:
                 self.equipment_data[title][name] = var
                 tk.Button(frame, text="Enter", command=lambda t=title, n=name, v = float(self.equipment_data[title][name].get()):
                            self.write_float_values(t, n, v)).grid(row=i + 1, column=2)
-                self.register_dictionary[title][name] = [tk.IntVar(), tk.IntVar()]
+                self.register_dictionary[title][name] = tk.IntVar()
                 
             if onoff_buttons: # Pressure in/outs and valves
                 tk.Button(frame, text="On", width=10, command=lambda t=title, n=name: self.toggle_onoff(t, n, True)).grid(row=i + 1, column=1, padx=15)
                 tk.Button(frame, text="Off", width=10, command=lambda t=title, n=name: self.toggle_onoff(t, n, False)).grid(row=i + 1, column=2, padx=15)
-                self.register_dictionary[title][name] = [tk.IntVar()]
+                self.register_dictionary[title][name] = tk.IntVar()
         
         frame.pack(anchor="nw", padx=15)
 
@@ -320,10 +319,13 @@ class System2:
             plc.disconnect()
 
     def temperature_connect(self):
-        self.toggle_connection("Temperatures", self.temperature_plc, read_float=True, plc_object=self.temperature_plc, data_type="Temperatures")
+        self.toggle_connection("Temperatures", self.temperature_plc, read_float=True, 
+                               plc_object=self.temperature_plc, data_type="Temperatures")
 
     def pressure_transmitter_connect(self):
-        self.toggle_connection("Pressure Transmitters", self.pressure_transmitter_plc, read_float=True, plc_object=self.pressure_transmitter_plc, data_type="Pressure Transmitters")
+        self.toggle_connection("Pressure Transmitters", self.pressure_transmitter_plc, 
+                               read_float=True, plc_object=self.pressure_transmitter_plc, 
+                               data_type="Pressure Transmitters")
 
     def valve_connect(self):
         self.toggle_connection("Valves", self.valve_plc)
@@ -347,9 +349,9 @@ class System2:
         """
         for equipment_name in self.equipment_data[data_type]:
             label = self.equipment_data[data_type][equipment_name]
-            reg1, reg2 = self.register_dictionary[data_type][equipment_name][0].get(), self.register_dictionary[data_type][equipment_name][1].get()
+            reg1 = self.register_dictionary[data_type][equipment_name].get()
 
-            t = threading.Thread(target=plc_object.read_float, args=(label, reg1, reg2))
+            t = threading.Thread(target=plc_object.read_float, args=(label, reg1))
             t.daemon = True
             t.start()
 
@@ -363,8 +365,8 @@ class System2:
         elif equipment_type == "Stirrers":
             plc_object = self.stirrer_plc
 
-        reg1, reg2 = self.register_dictionary[equipment_type][equipment_name][0].get(), self.register_dictionary[equipment_type][equipment_name][1].get()
-        plc_object.write_float(reg1, reg2, value)
+        reg1 = self.register_dictionary[equipment_type][equipment_name].get()
+        plc_object.write_float(reg1, value)
     
     def toggle_onoff(self, equipment_type, equipment_name, boolean):
         """
@@ -378,7 +380,7 @@ class System2:
         elif equipment_type == "Drums":
             plc_object = self.drum_plc
 
-        address = self.register_dictionary[equipment_type][equipment_name][0].get()
+        address = self.register_dictionary[equipment_type][equipment_name].get()
         plc_object.write_onoff(address, boolean)
 
     def create_assignment_section(self, title, headers, items):
@@ -392,9 +394,9 @@ class System2:
         for i, item in enumerate(items):
             tk.Label(table_frame, text=item).grid(row=i + 1, column=0, padx=5)
             
-            for j, var in enumerate(self.register_dictionary[title][items[i]]):
-                entry = tk.Entry(table_frame, textvariable=var)
-                entry.grid(row=i + 1, column=j + 1, padx=5)
+            # for j, var in enumerate(self.register_dictionary[title]):
+            entry = tk.Entry(table_frame, textvariable=self.register_dictionary[title][item])
+            entry.grid(row=i + 1, column=1, padx=5)
 
         table_frame.pack()
         frame.pack(pady=10)
@@ -440,45 +442,15 @@ class System2:
 
         self.create_assignment_section(
             title="Temperatures",
-            headers=["Name", "Register 1", "Register 2"],
+            headers=["Name", "Register 1"],
             items=self.temperatures_list
         )
 
         self.create_assignment_section(
             title="Pressure Transmitters",
-            headers=["Name", "Register 1", "Register 2"],
+            headers=["Name", "Register 1"],
             items=self.pressure_transmitters_list
         )
-
-        # self.create_assignment_section(
-        #     title="Pressure Regulators",
-        #     headers=["Name", "Register 1"],
-        #     items=self.pressure_regulators_list
-        # )
-
-        # self.create_assignment_section(
-        #     title="Pressure In/Outs",
-        #     headers=["Name", "Address"],
-        #     items=self.pressure_inouts_list
-        # )
-
-        # self.create_assignment_section(
-        #     title="Valves",
-        #     headers=["Name", "Address"],
-        #     items=self.valves_list
-        # )
-
-        # self.create_assignment_section(
-        #     title="Stirrers",
-        #     headers=["Name", "Register 1"],
-        #     items=self.stirrers_list
-        # )
-
-        # self.create_assignment_section(
-        #     title="Drums",
-        #     headers=["Name", "Register 1"],
-        #     items=self.drums_list
-        # )
 
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar_y.pack(side="right", fill="y")
@@ -490,6 +462,6 @@ class System2:
             quit()
 
     def test(self):
-        pass
+        print(self.register_dictionary["Temperatures"]["Temperature 1"].get())
 
 gui = System2()
