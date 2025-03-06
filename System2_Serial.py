@@ -10,8 +10,8 @@ class Pump:
     """
     Reglo ICC Pump Control Library
     """
-    def __init__(self, COM):
-        self.COM = COM
+    def __init__(self, port_number):
+        self.COM = f'COM{port_number}'
         self.sp = serial.Serial(
             self.COM,
             9600,
@@ -19,7 +19,6 @@ class Pump:
             stopbits=serial.STOPBITS_ONE,
             bytesize=serial.EIGHTBITS,
         )
-        return self.sp
 
     def __del__(self):
         self.sp.close()
@@ -114,24 +113,39 @@ class ReadFloatsPLC(PLC):
     def reading_onoff(self, boolean):
         self.reading = boolean
 
+<<<<<<< HEAD
     def read_float(self, label, reg1):
+=======
+    def read_float(self, label, reg1, reg2=None):
+>>>>>>> e185bf21225ec6fe59314ab9b4229debd50e0300
         """
         Inputs in two registers. The second register is optional.
 
-        If two registers are entered, the data is a 32 bit data, else
-        one register means 16 bit
+        If two registers are entered, the data is a 32-bit data, else
+        one register means 16-bit.
 
-        Returns a list of the modbus reponses (likely floats). If both
-        registers are inputted,
+        Returns a list of the modbus responses (likely floats). If both
+        registers are inputted, the data will be a 32-bit float.
         """
         while self.reading:
-            r1 = self.client.read_holding_registers(reg1).registers[0]
+            if reg2 is None:  # Single register (16-bit)
+                r1 = self.client.read_holding_registers(reg1).registers[0]
+                # Unpack as 16-bit value (using 'H')
+                current_value = float(r1)  # Treat it as a 16-bit value
+            else:  # Two registers (32-bit)
+                r1 = self.client.read_holding_registers(reg1).registers[0]
+                r2 = self.client.read_holding_registers(reg2).registers[0]
+                # Pack two 16-bit registers as a 32-bit float
+                packed = struct.pack('<HH', r1, r2)  # Combine the two 16-bit registers into a 32-bit value
+                current_value = struct.unpack('f', packed)[0]  # Unpack as a float
 
-            current_value = struct.unpack('f', struct.pack('<HH', int(r1)))[0]
-            current_value = round(current_value, 3)
+            # Round the value to 3 decimal places
+            current_value = round(current_value, 4)
 
+            # Update the label with the value
             label.config(text=str(current_value))
-            sleep(.5)
+
+            sleep(0.5)
 
 
 class OneBitClass(PLC):
@@ -148,14 +162,9 @@ class WriteFloatsPLC(PLC):
             payload = builder.to_registers()  # Converts to register values instead of raw bytes
 
             print(f"Writing value: {value} to registers {reg1}, {reg1+1}")
-            print(f"Payload: {payload}")
 
             result = self.client.write_registers(reg1, payload)
-
-            if result.isError():
-                print(f"Error writing float to registers {reg1}, {reg1+1}: {result}")
-            else:
-                print(f"Successfully wrote {value} to registers {reg1}, {reg1+1}")
+            print(result)
 
         except Exception as e:
             print(f"Exception in write_float: {e}")

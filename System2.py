@@ -312,7 +312,7 @@ class System2:
                 plc.reading_onoff(True)
                 self.read_float_values(plc_object, data_type)
         else:  # If connected, disconnect
-            self.connect_dictionary["vars"][device_name] = 2
+            self.connect_dictionary["vars"][device_name] = 0
             connect_button.config(bg="SystemButtonFace", text="Connect")
             if read_float:
                 plc.reading_onoff(False)
@@ -355,7 +355,7 @@ class System2:
             t.daemon = True
             t.start()
 
-    def write_float_values(self, equipment_type, equipment_name, value):
+    def write_float_values(self, equipment_type, equipment_name):
         """
         Function to write float values to PLC.
         equipment type will be "Pressure Regulators" or "Stirrers"
