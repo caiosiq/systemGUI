@@ -351,11 +351,11 @@ class System2:
             label = self.equipment_data[data_type][equipment_name]
             reg1 = self.register_dictionary[data_type][equipment_name].get()
 
-            t = threading.Thread(target=plc_object.read_float, args=(label, reg1))
+            t = threading.Thread(target=plc_object.read_float, args=(label, reg1, reg1+1))
             t.daemon = True
             t.start()
 
-    def write_float_values(self, equipment_type, equipment_name):
+    def write_float_values(self, equipment_type, equipment_name, value):
         """
         Function to write float values to PLC.
         equipment type will be "Pressure Regulators" or "Stirrers"
@@ -366,7 +366,6 @@ class System2:
             plc_object = self.stirrer_plc
 
         reg1 = self.register_dictionary[equipment_type][equipment_name].get()
-        value = self.equipment_data[equipment_type][equipment_name].get()
         plc_object.write_float(reg1, value)
     
     def toggle_onoff(self, equipment_type, equipment_name, boolean):
