@@ -366,6 +366,7 @@ class System2:
             plc_object = self.stirrer_plc
 
         reg1 = self.register_dictionary[equipment_type][equipment_name].get()
+        value = self.equipment_data[equipment_type][equipment_name].get()
         plc_object.write_float(reg1, value)
     
     def toggle_onoff(self, equipment_type, equipment_name, boolean):

@@ -113,11 +113,7 @@ class ReadFloatsPLC(PLC):
     def reading_onoff(self, boolean):
         self.reading = boolean
 
-<<<<<<< HEAD
     def read_float(self, label, reg1):
-=======
-    def read_float(self, label, reg1, reg2=None):
->>>>>>> e185bf21225ec6fe59314ab9b4229debd50e0300
         """
         Inputs in two registers. The second register is optional.
 
