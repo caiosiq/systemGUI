@@ -53,20 +53,17 @@ class Pump:
         return self.sp.read(self.sp.in_waiting).decode()
 
     def set_speed(self, channel: int, speed: float) -> str:
-                
-        # Convert speed to required format (3 digits before decimal, 2 after)
-        # Multiply by 100 to handle 2 decimal places without floating point issues
-        speed_int = int(round(speed * 100))
-        
-        # Format as 5 digits (3 before decimal, 2 after)
-        # For example: 24.00 RPM becomes "02400"
-        speed_string = f"{speed_int:05d}"
+        command = f"{channel}M\r".encode()  # set flow rate mode
+        self.sp.write(command)
 
-        command = f"{channel}f{speed_string}\r"
+        # Convert speed to scientific notation format (e.g., 4.5 → "0450E-3")
+        speed_int = int(speed * 1000)  # Convert to integer in nL/min
+        speed_string = f"{speed_int:04d}-3"  # Format as "XXXX-3"
+
+        command = f"{channel}f{speed_string}\r" # set speed command
         self.sp.write(command.encode())
-        response = self.sp.read(self.sp.in_waiting).decode()
         sleep(0.1)
-        print(response)
+        print(self.sp.read(self.sp.in_waiting).decode())
 
     def get_speed(self, channel):
         command = f"{channel}S\r".encode()
@@ -152,15 +149,14 @@ class OneBitClass(PLC):
 class WriteFloatsPLC(PLC):
     def write_float(self, reg1, value): # reg2 is automatically reg1 + 1 in the code
         try:
-            # builder = BinaryPayloadBuilder(byteorder=Endian.LITTLE, wordorder=Endian.LITTLE)
-            builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
+            print('this is the value', value)
+            builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.LITTLE)
             builder.add_32bit_float(value)
             payload = builder.to_registers()  # Converts to register values instead of raw bytes
 
             print(f"Writing value: {value} to registers {reg1}, {reg1+1}")
 
             result = self.client.write_registers(reg1, payload)
-            print(result)
 
         except Exception as e:
             print(f"Exception in write_float: {e}")

@@ -1,5 +1,7 @@
 import tkinter as tk
 import threading
+from pydoc import resolve
+
 from System2_Serial import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC
 
 class PumpControl:
@@ -222,7 +224,6 @@ class System2:
         channel_num = int(pump.channel_var.get())
         flow_rate = float(pump.flow_var.get())
 
-        pump_ser.set_mode(channel_num, 1)  # Set to flow rate mode
         pump_ser.set_speed(channel_num, flow_rate)
 
     # other
@@ -252,8 +253,10 @@ class System2:
                 entry_field = tk.Entry(frame, textvariable=var)
                 entry_field.grid(row=i + 1, column=1, padx=15, pady=5)
                 self.equipment_data[title][name] = var
-                tk.Button(frame, text="Enter", command=lambda t=title, n=name, v = float(self.equipment_data[title][name].get()):
-                           self.write_float_values(t, n, v)).grid(row=i + 1, column=2)
+                (tk.Button(frame, text="Enter",
+                          command=lambda t=title, n=name, v=var: self.write_float_values(t, n, float(v.get()))
+                           ).grid(row=i + 1, column=2)
+                 )
                 self.register_dictionary[title][name] = tk.IntVar()
                 
             if onoff_buttons: # Pressure in/outs and valves
@@ -452,6 +455,36 @@ class System2:
             items=self.pressure_transmitters_list
         )
 
+        self.create_assignment_section(
+            title="Pressure Regulators",
+            headers=["Name", "Register 1"],
+            items=self.pressure_regulators_list
+        )
+
+        self.create_assignment_section(
+            title="Pressure In/Outs",
+            headers=["Name", "Address"],
+            items=self.pressure_inouts_list
+        )
+
+        self.create_assignment_section(
+            title="Valves",
+            headers=["Name", "Address"],
+            items=self.valves_list
+        )
+
+        self.create_assignment_section(
+            title="Stirrers",
+            headers=["Name", "Register 1"],
+            items=self.stirrers_list
+        )
+
+        self.create_assignment_section(
+            title="Drums",
+            headers=["Name", "Register 1"],
+            items=self.drums_list
+        )
+
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar_y.pack(side="right", fill="y")
 
@@ -462,6 +495,7 @@ class System2:
             quit()
 
     def test(self):
-        print(self.register_dictionary["Temperatures"]["Temperature 1"].get())
+        print('Hello, World')
+
 
 gui = System2()
