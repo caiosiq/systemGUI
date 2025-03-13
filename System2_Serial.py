@@ -23,6 +23,13 @@ class Pump:
     def __del__(self):
         self.sp.close()
 
+    def set_independent_channel_control(self):
+        # Enable independent channel control mode
+        command = "1~1\r".encode()
+        self.sp.write(command)
+        sleep(0.1)
+        print(self.sp.read(self.sp.in_waiting).decode())
+
     def start_channel(self, channel):
         command = f"{channel}H\r".encode()
         self.sp.write(command)

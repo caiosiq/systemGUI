@@ -14,8 +14,20 @@ class PumpControl:
         self.flow_var = flow_var  # Flow rate input variable
 
     def set_serial_obj(self, serial_obj):
-        print('Setting serial object')
+        print('Setting pump serial object')
         self.serial_obj = serial_obj
+
+# holds all pump and plc addresses
+addresses = {
+    'Pumps': [9],
+    'Temperatures': [28710, 28712, 28714],
+    'Pressure Transmitters': [28750, 28752, 28754],
+    'Pressure Regulators': [28770, 28772],
+    'Pressure In/Outs': [8352, 8353, 8354, 8355, 8356, 8357],
+    'Valves': [8358],
+    'Stirrers': [28790, 28792, 28794],
+    'Drums': [16387]
+}
 
 class System2:
     def __init__(self):
@@ -122,7 +134,7 @@ class System2:
         tk.Label(frame, text="Pumps", font=("Arial", 16, "underline")).grid(sticky="w", row=0, column=0)
 
         # Column headers
-        headers = ["Connect", "On", "Off", "Channel Number", "Flow Rate", "Set Flow Rate"]
+        headers = ["Connect", "Channel Number", "On", "Off", "Flow Rate", "Set Flow Rate"]
         for col, text in enumerate(headers, start=1):
             tk.Label(frame, text=text, font=("Arial", 12, "bold")).grid(row=1, column=col)
 
@@ -131,10 +143,10 @@ class System2:
 
             # Create buttons and entry fields
             connect_btn = tk.Button(frame, text="Disconnected", width=12, command=lambda i=i: self.pump_connect(i))
-            on_btn = tk.Button(frame, text="On", width=7, command=lambda i=i: self.pump_on(i))
-            off_btn = tk.Button(frame, text="Off", width=7, command=lambda i=i: self.pump_off(i))
             channel_var = tk.StringVar()
             channel_entry = tk.Entry(frame, textvariable=channel_var, width=5)
+            on_btn = tk.Button(frame, text="On", width=7, command=lambda i=i: self.pump_on(i))
+            off_btn = tk.Button(frame, text="Off", width=7, command=lambda i=i: self.pump_off(i))
             flow_var = tk.StringVar()
             flow_entry = tk.Entry(frame, textvariable=flow_var, width=15)
             set_flow_btn = tk.Button(frame, text="Set", width=5, command=lambda i=i: self.pump_set_flow_rate(i))
@@ -144,9 +156,9 @@ class System2:
 
             # Place elements in the grid
             connect_btn.grid(row=i + 2, column=1, padx=10)
-            on_btn.grid(row=i + 2, column=2, padx=10)
-            off_btn.grid(row=i + 2, column=3, padx=10)
-            channel_entry.grid(row=i + 2, column=4, padx=10)
+            channel_entry.grid(row=i + 2, column=2, padx=10)
+            on_btn.grid(row=i + 2, column=3, padx=10)
+            off_btn.grid(row=i + 2, column=4, padx=10)
             flow_entry.grid(row=i + 2, column=5, padx=10)
             set_flow_btn.grid(row=i + 2, column=6)
 
@@ -181,6 +193,7 @@ class System2:
 
             com_number = str(self.pump_port_vars[pump_index].get())
             pump_ser = Pump(com_number)
+            pump_ser.set_independent_channel_control()
             pump.set_serial_obj(pump_ser)
 
         else:  # If already connected
@@ -237,10 +250,11 @@ class System2:
         for i, name in enumerate(items):
             tk.Label(frame, text=name).grid(row=i + 1, column=0, sticky="w", pady=5)
             if display_current: # Temperatures and pressure trasmitters // read float class
-                current_label = tk.Label(frame, text=None, bg="white", borderwidth=1, relief="raised", width=10)
+                current_label = tk.Label(frame, text='', bg="white", borderwidth=1, relief="raised", width=10)
                 current_label.grid(row=i + 1, column=1, padx=15)
                 self.equipment_data[title][name] = current_label
-                self.register_dictionary[title][name] = tk.IntVar()
+                address = addresses[title][i]
+                self.register_dictionary[title][name] = tk.IntVar(value=address)
 
                 # connnect button for these two equipments
                 connect_button = tk.Button(frame, text="Connect", font=("Arial", 12, "bold"), width=12, command=connect_command)
@@ -257,12 +271,14 @@ class System2:
                           command=lambda t=title, n=name, v=var: self.write_float_values(t, n, float(v.get()))
                            ).grid(row=i + 1, column=2)
                  )
-                self.register_dictionary[title][name] = tk.IntVar()
+                address = addresses[title][i]
+                self.register_dictionary[title][name] = tk.IntVar(value=address)
                 
             if onoff_buttons: # Pressure in/outs and valves
                 tk.Button(frame, text="On", width=10, command=lambda t=title, n=name: self.toggle_onoff(t, n, True)).grid(row=i + 1, column=1, padx=15)
                 tk.Button(frame, text="Off", width=10, command=lambda t=title, n=name: self.toggle_onoff(t, n, False)).grid(row=i + 1, column=2, padx=15)
-                self.register_dictionary[title][name] = tk.IntVar()
+                address = addresses[title][i]
+                self.register_dictionary[title][name] = tk.IntVar(value=address)
         
         frame.pack(anchor="nw", padx=15)
 
@@ -434,7 +450,8 @@ class System2:
         for i, name in enumerate(self.pumps_list):
             tk.Label(pump_frame, text=name).grid(row=i + 1, column=0, padx=5)
 
-            self.pump_port_var = tk.IntVar()
+            address = addresses["Pumps"][i]
+            self.pump_port_var = tk.IntVar(value=address)
             if self.pump_port_vars[i]:
                 self.pump_port_var.set(self.pump_port_vars[i].get())
             pump_port_entry = tk.Entry(pump_frame, textvariable=self.pump_port_var)
