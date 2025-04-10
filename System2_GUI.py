@@ -1,6 +1,9 @@
 import tkinter as tk
 import threading
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC
+from System2_utils import Graph
 
 class PumpControl:
     """Encapsulates all UI elements for a pump."""
@@ -9,7 +12,7 @@ class PumpControl:
         self.on_button = on_button  # On button
         self.off_button = off_button  # Off button
         self.channel_var = channel_var  # Channel number input variable
-        self.flow_var = flow_var  # Flow rate input variable
+        self.flow_var = flow_var  #  input variable
 
     def set_serial_obj(self, serial_obj):
         print('Setting pump serial object')
@@ -30,20 +33,35 @@ addresses = {
 class System2:
     def __init__(self):
         self.root = tk.Tk()
-        tk.Label(self.root, text="System Two", font=("Arial", 18, "bold")).pack(
-            pady=10
-        )
+        self.root.title("System Two Control Panel")
+        self.root.state('zoomed')  # Maximize window for better visibility
+        
+        main_frame = tk.Frame(self.root)
+        main_frame.pack(fill="both", expand=True)
+        
+        # Split the interface into equipment control and graph areas
+        left_panel = tk.Frame(main_frame)
+        left_panel.pack(side="left", fill="y", padx=10, pady=10)
+        
+        right_panel = tk.Frame(main_frame)
+        right_panel.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+        
+        tk.Label(left_panel, text="System Two Control", font=("Arial", 18, "bold")).pack(pady=10)
 
-        vscrollbar = tk.Scrollbar(self.root, orient="vertical")
+        # Create a canvas with scrollbars for equipment control
+        vscrollbar = tk.Scrollbar(left_panel, orient="vertical")
         vscrollbar.pack(fill="y", side="right", expand=False)
-        hscrollbar = tk.Scrollbar(self.root, orient="horizontal")
+        
+        hscrollbar = tk.Scrollbar(left_panel, orient="horizontal")
         hscrollbar.pack(fill="x", side="bottom", expand=False)
+        
         canvas = tk.Canvas(
-            self.root,
+            left_panel,
             bd=0,
             highlightthickness=0,
             yscrollcommand=vscrollbar.set,
             xscrollcommand=hscrollbar.set,
+            width=500,  # Fixed width for equipment panel
         )
         canvas.pack(side="left", fill="both", expand=True)
         vscrollbar.config(command=canvas.yview)
@@ -72,6 +90,8 @@ class System2:
 
         ### ---EQUIPMENT--- ###
         self.equipment_frame = tk.Frame(gui_frame)
+        enter_button = tk.Button(self.equipment_frame, text="Assign and Read Data", command=self.open_assign)
+        enter_button.pack(anchor="nw", padx=15, pady=15)
 
         ### --- PUMPS --- ###
         self.pumps_list = ["Pump 1"]
@@ -99,10 +119,6 @@ class System2:
         self.create_stirrer_section()
         self.create_drum_section()
 
-        # Create the assign button
-        enter_button = tk.Button(self.root, text="Assign and Read Data", command=self.open_assign)
-        enter_button.place(x=50, y=10)
-
         self.equipment_frame.grid(row=0, column=0, sticky="nw")
 
         # Initiate Classes
@@ -119,11 +135,300 @@ class System2:
 
         gui_frame.pack()
 
+        # Setup for graphs
+        self.setup_graphs(right_panel)
+
         tk.Button(self.root, text="TEST", command=self.test).place(x=10, y=10)
-        self.root.bind(
-            "<KeyPress>", self.exit_shortcut
-        )  # press escape button on keyboard to close the GUI
+        self.root.bind("<KeyPress>", self.exit_shortcut) # press escape button on keyboard to close the GUI
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
+
+    def setup_graphs(self, parent_frame):
+        """Create the graph UI and initialize graph objects"""
+        # Create frame for graph controls
+        graph_control_frame = tk.Frame(parent_frame)
+        graph_control_frame.pack(fill="x", pady=10)
+        
+        # Labels
+        tk.Label(graph_control_frame, text="Data Visualization", font=("Arial", 16, "bold")).pack(anchor="w")
+        
+        # Create buttons for graph control
+        control_buttons_frame = tk.Frame(graph_control_frame)
+        control_buttons_frame.pack(fill="x", pady=5)
+        
+        # Time window control
+        tk.Label(control_buttons_frame, text="Time Window:").grid(row=0, column=0, padx=5)
+        self.time_window_var = tk.StringVar(value="120")
+        time_window_entry = tk.Entry(control_buttons_frame, textvariable=self.time_window_var, width=6)
+        time_window_entry.grid(row=0, column=1, padx=5)
+        tk.Label(control_buttons_frame, text="seconds").grid(row=0, column=2, padx=5)
+        tk.Button(control_buttons_frame, text="Set", command=self.set_time_window).grid(row=0, column=3, padx=5)
+        
+        # Export data button
+        tk.Button(control_buttons_frame, text="Export Data", command=self.export_graph_data).grid(row=0, column=4, padx=20)
+        
+        # Clear data button
+        tk.Button(control_buttons_frame, text="Clear All Data", command=self.clear_graph_data).grid(row=0, column=5, padx=5)
+        
+        # Start/Stop graphing
+        self.graph_running = True
+        self.graph_button = tk.Button(control_buttons_frame, text="Stop Graphing", bg="light coral", command=self.toggle_graphing)
+        self.graph_button.grid(row=0, column=6, padx=20)
+        
+        # Create a frame for the graphs
+        graph_frame = tk.Frame(parent_frame)
+        graph_frame.pack(fill="both", expand=True, pady=5)
+        
+        # Configure matplotlib
+        fig, self.plot_axes = plt.subplots(2, 2, figsize=(10, 8))
+        self.plot_axes = self.plot_axes.flatten()
+        
+        # Convert to a tkinter widget
+        canvas = FigureCanvasTkAgg(fig, master=graph_frame)
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        self.canvas = canvas
+        
+        # Initialize dictionaries for graph data
+        self.init_graph_data()
+        
+        # Create data series selector frame
+        data_selector_frame = tk.Frame(parent_frame)
+        data_selector_frame.pack(fill="x", pady=5)
+        
+        # Create tabs for different types of data
+        self.create_data_selector_tabs(data_selector_frame)
+        
+        # Start the graph
+        self.start_graph()
+
+    def init_graph_data(self):
+        """Initialize dictionaries for the graph data"""
+        # For each data type, create a dictionary to store the series
+        # Format: {series_name: [global_switch(bool), active_status(bool), data_points(list)]}
+        
+        # Temperature data
+        self.temperature_dict = {}
+        for name in self.temperatures_list:
+            self.temperature_dict[name] = [True, True, []]
+        
+        # Pressure data
+        self.pressure_dict = {}
+        for name in self.pressure_transmitters_list:
+            self.pressure_dict[name] = [True, True, []]
+        
+        # Balance data - placeholder for any balance equipment
+        self.balance_dict = {}
+        
+        #  data
+        self.flow_rate_dict = {}
+        for pump_name in self.pumps_list:
+            self.flow_rate_dict[pump_name] = [True, True, []]
+        
+        # Create the graph object
+        self.graph = Graph(
+            self.temperature_dict,
+            self.pressure_dict, 
+            self.balance_dict,
+            self.flow_rate_dict,
+            max_points=1000,  # Store up to 1000 data points per series
+            update_interval=0.5  # Update every 0.5 seconds
+        )
+
+    def create_data_selector_tabs(self, parent_frame):
+        """Create tabs for selecting which data series to display"""
+        # Create notebook for tabs
+        notebook = tk.Frame(parent_frame)
+        notebook.pack(fill="x")
+        
+        # Create tab buttons
+        tab_frame = tk.Frame(notebook)
+        tab_frame.pack(fill="x")
+        
+        self.tab_buttons = []
+        self.tab_frames = []
+        
+        tab_names = ["Temperature", "Pressure", "Flow_Rate"]
+        
+        for i, name in enumerate(tab_names):
+            button = tk.Button(tab_frame, text=name, 
+                              command=lambda idx=i: self.switch_tab(idx))
+            button.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+            self.tab_buttons.append(button)
+        
+        # Create content frames for each tab
+        self.tab_content_frame = tk.Frame(notebook)
+        self.tab_content_frame.pack(fill="x", expand=True)
+        
+        # Create content for temperature tab
+        temp_frame = tk.Frame(self.tab_content_frame)
+        self.create_series_selectors(temp_frame, "Temperature", self.temperatures_list)
+        self.tab_frames.append(temp_frame)
+        
+        # Create content for pressure tab
+        pressure_frame = tk.Frame(self.tab_content_frame)
+        self.create_series_selectors(pressure_frame, "Pressure", self.pressure_transmitters_list)
+        self.tab_frames.append(pressure_frame)
+        
+        # Create content for flow rate tab
+        flow_frame = tk.Frame(self.tab_content_frame)
+        self.create_series_selectors(flow_frame, "Flow_Rate", self.pumps_list)
+        self.tab_frames.append(flow_frame)
+        
+        # Show first tab by default
+        self.switch_tab(0)
+
+    def switch_tab(self, tab_index):
+        """Switch between data selector tabs"""
+        for i, button in enumerate(self.tab_buttons):
+            if i == tab_index:
+                button.config(relief="sunken", bg="light blue")
+            else:
+                button.config(relief="raised", bg="SystemButtonFace")
+        
+        for i, frame in enumerate(self.tab_frames):
+            if i == tab_index:
+                frame.pack(fill="x", expand=True)
+            else:
+                frame.pack_forget()
+
+    def create_series_selectors(self, parent_frame, data_type, series_list):
+        """
+        Create checkboxes for each data series that directly control visibility.
+        
+        Args:
+            parent_frame: Frame to place checkboxes in
+            data_type: Type of data (Temperature, Pressure, etc.)
+            series_list: List of series names
+        """
+        # Dict to store checkbox variables
+        if not hasattr(self, 'checkbox_vars'):
+            self.checkbox_vars = {}
+        
+        # Add a 'select all' button
+        all_button = tk.Button(parent_frame, text=f"Select All {data_type}", 
+                            command=lambda: self.toggle_all_series(data_type.lower(), True))
+        all_button.pack(side="left", padx=5, pady=5)
+        
+        # Add a 'deselect all' button
+        none_button = tk.Button(parent_frame, text=f"Deselect All {data_type}", 
+                            command=lambda: self.toggle_all_series(data_type.lower(), False))
+        none_button.pack(side="left", padx=5, pady=5)
+        
+        # Create a frame for the checkboxes
+        checkbox_frame = tk.Frame(parent_frame)
+        checkbox_frame.pack(fill="x", padx=5, pady=5)
+        
+        # Create a checkbox for each series
+        for i, name in enumerate(series_list):
+            # Get the dictionary for this data type
+            data_dict = getattr(self.graph, f"{data_type.lower()}_dict")
+            
+            # Initialize checkbox variable based on current series visibility
+            is_visible = data_dict[name][1] if name in data_dict else True
+            
+            # Create variable and store it
+            var = tk.BooleanVar(value=is_visible)
+            self.checkbox_vars[f"{data_type.lower()}_{name}"] = var
+            
+            # Create the checkbox with a command that updates visibility
+            cb = tk.Checkbutton(
+                checkbox_frame, 
+                text=name, 
+                variable=var,
+                command=lambda n=name, t=data_type.lower(), v=var: self.update_series_visibility(t, n, v.get())
+            )
+            cb.grid(row=i//3, column=i%3, sticky="w", padx=10, pady=3)
+
+    def update_series_visibility(self, data_type, series_name, is_visible):
+        """
+        Update the visibility of a data series based on checkbox state.
+        
+        Args:
+            data_type: Type of data (temperature, pressure, etc.)
+            series_name: Name of the data series
+            is_visible: Boolean indicating if series should be visible
+        """
+        # Get the dictionary for this data type
+        data_dict = getattr(self.graph, f"{data_type}_dict")
+        
+        if series_name in data_dict:
+            # If the current visibility state is different from the desired state
+            if data_dict[series_name][1] != is_visible:
+                # When turning off, add a discontinuity marker
+                if not is_visible:
+                    data_dict[series_name][2].append((None, None))
+                
+                # Update the visibility state
+                data_dict[series_name][1] = is_visible
+
+    def toggle_all_series(self, data_type, visible):
+        """
+        Set all series of a specific type to visible or invisible.
+        
+        Args:
+            data_type: Type of data (temperature, pressure, etc.)
+            visible: Boolean indicating if series should be visible
+        """
+        # Get the dictionary for this data type
+        data_dict = getattr(self.graph, f"{data_type}_dict")
+        
+        # Update all series in this dictionary
+        for name in data_dict:
+            # Update the checkboxes
+            checkbox_key = f"{data_type}_{name}"
+            if checkbox_key in self.checkbox_vars:
+                self.checkbox_vars[checkbox_key].set(visible)
+            
+            # Update the data visibility directly
+            if data_dict[name][1] != visible and not visible:
+                # Add discontinuity marker if hiding
+                data_dict[name][2].append((None, None))
+            
+            # Set visibility
+            data_dict[name][1] = visible
+
+    def start_graph(self):
+        """Start the graph plotting thread"""
+        self.graph_thread = threading.Thread(
+            target=self.graph.plot, 
+            args=(self.plot_axes, self.canvas, plt.gcf())
+        )
+        self.graph_thread.daemon = True
+        self.graph_thread.start()
+
+    def toggle_graphing(self):
+        """Toggle the graph plotting on/off"""
+        self.graph_running = not self.graph_running
+        
+        if self.graph_running:
+            self.graph.stop_plotting(False)
+            self.graph_button.config(text="Stop Graphing", bg="light coral")
+            # Restart the thread if it's stopped
+            if not self.graph_thread.is_alive():
+                self.start_graph()
+        else:
+            self.graph.stop_plotting(True)
+            self.graph_button.config(text="Start Graphing", bg="pale green")
+
+    def set_time_window(self):
+        """Set the time window for the graph"""
+        try:
+            time_window = int(self.time_window_var.get())
+            if time_window > 0:
+                self.graph.set_time_window(time_window)
+        except ValueError:
+            # Handle invalid input
+            self.time_window_var.set("120")  # Reset to default
+
+    def export_graph_data(self):
+        """Export graph data to CSV"""
+        filename = self.graph.export_data()
+        tk.messagebox.showinfo("Data Exported", f"Data exported to {filename}")
+
+    def clear_graph_data(self):
+        """Clear all graph data"""
+        if tk.messagebox.askyesno("Clear Data", "Are you sure you want to clear all graph data?"):
+            self.graph.clear_data()
 
     # pumps
     def create_pump_ui(self):
@@ -132,7 +437,7 @@ class System2:
         tk.Label(frame, text="Pumps", font=("Arial", 16, "underline")).grid(sticky="w", row=0, column=0)
 
         # Column headers
-        headers = ["Connect", "Channel Number", "On", "Off", "Flow Rate", "Set Flow Rate"]
+        headers = ["Connect", "Channel Number", "On", "Off", "Flow_Rate", "Set Flow_Rate"]
         for col, text in enumerate(headers, start=1):
             tk.Label(frame, text=text, font=("Arial", 12, "bold")).grid(row=1, column=col)
 
@@ -236,6 +541,9 @@ class System2:
         flow_rate = float(pump.flow_var.get())
 
         pump_ser.set_speed(channel_num, flow_rate)
+        
+        # Update the graph with the new 
+        self.graph.update_dict("flow_rate", self.pumps_list[pump_index], flow_rate)
 
     # other
     def create_equipment_section(self, title, items, connect_command, display_current=False, entry=False, onoff_buttons=False):
@@ -358,48 +666,7 @@ class System2:
 
     def drum_connect(self):
         self.toggle_connection("Drums", self.drum_plc)
-
-    def read_float_values(self, plc_object, data_type):
-        """
-        For PLC equipment that reads float values
-        data_type is the type of equipment (i.e. Temperatures or Pressure Transmitters)
-        """
-        for equipment_name in self.equipment_data[data_type]:
-            label = self.equipment_data[data_type][equipment_name]
-            reg1 = self.register_dictionary[data_type][equipment_name].get()
-
-            t = threading.Thread(target=plc_object.read_float, args=(label, reg1, reg1+1))
-            t.daemon = True
-            t.start()
-
-    def write_float_values(self, equipment_type, equipment_name, value):
-        """
-        Function to write float values to PLC.
-        equipment type will be "Pressure Regulators" or "Stirrers"
-        """
-        if equipment_type == "Pressure Regulators":
-            plc_object = self.pressure_regulator_plc
-        elif equipment_type == "Stirrers":
-            plc_object = self.stirrer_plc
-
-        reg1 = self.register_dictionary[equipment_type][equipment_name].get()
-        plc_object.write_float(reg1, value)
     
-    def toggle_onoff(self, equipment_type, equipment_name, boolean):
-        """
-        Turn equipment on or off
-        equipment type is "Pressure In/Outs" or "Valves"
-        """
-        if equipment_type == "Pressure In/Outs":
-            plc_object = self.pressure_inout_plc
-        elif equipment_type == "Valves":
-            plc_object = self.valve_plc
-        elif equipment_type == "Drums":
-            plc_object = self.drum_plc
-
-        address = self.register_dictionary[equipment_type][equipment_name].get()
-        plc_object.write_onoff(address, boolean)
-
     def create_assignment_section(self, title, headers, items):
         frame = tk.Frame(self.scrollable_frame)
         tk.Label(frame, text=title, font=("Arial", 12, "bold")).pack(pady=5)
@@ -417,7 +684,7 @@ class System2:
 
         table_frame.pack()
         frame.pack(pady=10)
-
+    
     def open_assign(self):
         self.assign_page = tk.Toplevel(self.root)
         self.assign_page.title("Assign Equipment")
@@ -503,14 +770,55 @@ class System2:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar_y.pack(side="right", fill="y")
 
-    # Other functions
+    def read_float_values(self, plc_object, data_type):
+        """
+        For PLC equipment that reads float values
+        data_type is the type of equipment (i.e. Temperatures or Pressure Transmitters)
+        """
+        for equipment_name in self.equipment_data[data_type]:
+            label = self.equipment_data[data_type][equipment_name]
+            reg1 = self.register_dictionary[data_type][equipment_name].get()
+
+            # Create a custom function to update both the label and the graph
+            def update_value_and_graph(label, equipment_name, data_type):
+                def _update(value):
+                    # Update the label
+                    label.config(text=str(value))
+                    # Update the graph data
+                    data_type_lower = data_type.lower()
+                    self.graph.update_dict(data_type_lower, equipment_name, value)
+                return _update
+
+            callback = update_value_and_graph(label, equipment_name, data_type)
+            
+            # Modified to pass our custom callback function that updates both UI and graph
+            t = threading.Thread(target=lambda: plc_object.read_float(callback, reg1, reg1+1))
+            t.daemon = True
+            t.start()
+    
     def exit_shortcut(self, event):
-        """Shortcut for exiting all pages"""
+        """Exit the GUI when the escape key is pressed."""
         if event.keysym == "Escape":
-            quit()
+            self.root.quit()
+    
+    def on_closing(self):
+        """Handle window close event (X button)"""
+        if hasattr(self, 'graph'):
+            self.graph.stop_plotting(True)  # Stop the plot thread
+        
+        if hasattr(self, 'testing') and self.testing:
+            self.testing = False  # Stop the test data thread if running
+        
+        # Wait briefly for threads to terminate
+        import time
+        time.sleep(0.2)
+        
+        self.root.destroy()  # Destroy the Tkinter root window
+        import sys
+        sys.exit(0)  # Force exit the Python process
 
     def test(self):
-        print('Hello, World')
 
+        pass
 
 gui = System2()

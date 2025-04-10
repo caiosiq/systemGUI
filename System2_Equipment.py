@@ -113,40 +113,55 @@ class PLC:
         print("Disconnected")
 
 
+# Modified ReadFloatsPLC class to support callbacks
 class ReadFloatsPLC(PLC):
+    def __init__(self, host_num, port_num=None) -> None:
+        super().__init__(host_num, port_num)
+        self.reading = False
+        self.data = None
+
     def reading_onoff(self, boolean):
         self.reading = boolean
 
-    def read_float(self, label, reg1, reg2):
+    def read_float(self, label_or_callback, reg1, reg2=None):
         """
         Inputs in two registers. The second register is optional.
 
         If two registers are entered, the data is a 32-bit data, else
         one register means 16-bit.
 
-        Returns a list of the modbus responses (likely floats). If both
-        registers are inputted, the data will be a 32-bit float.
+        The label_or_callback parameter can be either:
+        1. A tk.Label to update directly (for backward compatibility)
+        2. A callback function that receives the value (preferred for graph integration)
         """
         while self.reading:
-            if reg2 is None:  # Single register (16-bit)
-                r1 = self.client.read_holding_registers(reg1).registers[0]
-                # Unpack as 16-bit value (using 'H')
-                current_value = float(r1)  # Treat it as a 16-bit value
-            else:  # Two registers (32-bit)
-                r1 = self.client.read_holding_registers(reg1).registers[0]
-                r2 = self.client.read_holding_registers(reg2).registers[0]
-                # Pack two 16-bit registers as a 32-bit float
-                packed = struct.pack('<HH', r1, r2)  # Combine the two 16-bit registers into a 32-bit value
-                current_value = struct.unpack('f', packed)[0]  # Unpack as a float
+            try:
+                if reg2 is None:  # Single register (16-bit)
+                    r1 = self.client.read_holding_registers(reg1).registers[0]
+                    # Unpack as 16-bit value (using 'H')
+                    current_value = float(r1)  # Treat it as a 16-bit value
+                else:  # Two registers (32-bit)
+                    r1 = self.client.read_holding_registers(reg1).registers[0]
+                    r2 = self.client.read_holding_registers(reg2).registers[0]
+                    # Pack two 16-bit registers as a 32-bit float
+                    packed = struct.pack('<HH', r1, r2)  # Combine the two 16-bit registers into a 32-bit value
+                    current_value = struct.unpack('f', packed)[0]  # Unpack as a float
 
-            # Round the value to 3 decimal places
-            current_value = round(current_value, 4)
+                # Round the value to 3 decimal places
+                current_value = round(current_value, 4)
 
-            # Update the label with the value
-            label.config(text=str(current_value))
+                # Update the label or call the callback
+                if callable(label_or_callback):
+                    # It's a callback function
+                    label_or_callback(current_value)
+                else:
+                    # It's a label widget (for backward compatibility)
+                    label_or_callback.config(text=str(current_value))
 
+            except Exception as e:
+                print(f"Error reading float: {e}")
+                
             sleep(0.5)
-
 
 class OneBitClass(PLC):
     def write_onoff(self, address_num, boolean):
