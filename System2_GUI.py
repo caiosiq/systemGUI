@@ -207,29 +207,29 @@ class System2:
         # Format: {series_name: [global_switch(bool), active_status(bool), data_points(list)]}
         
         # Temperature data
-        self.temperature_dict = {}
+        self.temperatures_dict = {}
         for name in self.temperatures_list:
-            self.temperature_dict[name] = [True, True, []]
+            self.temperatures_dict[name] = [True, True, []]
         
         # Pressure data
-        self.pressure_dict = {}
+        self.pressures_dict = {}
         for name in self.pressure_transmitters_list:
-            self.pressure_dict[name] = [True, True, []]
+            self.pressures_dict[name] = [True, True, []]
         
         # Balance data - placeholder for any balance equipment
-        self.balance_dict = {}
+        self.balances_dict = {}
         
         #  data
-        self.flow_rate_dict = {}
+        self.flow_rates_dict = {}
         for pump_name in self.pumps_list:
-            self.flow_rate_dict[pump_name] = [True, True, []]
+            self.flow_rates_dict[pump_name] = [True, True, []]
         
         # Create the graph object
         self.graph = Graph(
-            self.temperature_dict,
-            self.pressure_dict, 
-            self.balance_dict,
-            self.flow_rate_dict,
+            self.temperatures_dict,
+            self.pressures_dict, 
+            self.balances_dict,
+            self.flow_rates_dict,
             max_points=1000,  # Store up to 1000 data points per series
             update_interval=0.5  # Update every 0.5 seconds
         )
@@ -261,17 +261,17 @@ class System2:
         
         # Create content for temperature tab
         temp_frame = tk.Frame(self.tab_content_frame)
-        self.create_series_selectors(temp_frame, "Temperature", self.temperatures_list)
+        self.create_series_selectors(temp_frame, "Temperatures", self.temperatures_list)
         self.tab_frames.append(temp_frame)
         
         # Create content for pressure tab
         pressure_frame = tk.Frame(self.tab_content_frame)
-        self.create_series_selectors(pressure_frame, "Pressure", self.pressure_transmitters_list)
+        self.create_series_selectors(pressure_frame, "Pressures", self.pressure_transmitters_list)
         self.tab_frames.append(pressure_frame)
         
         # Create content for flow rate tab
         flow_frame = tk.Frame(self.tab_content_frame)
-        self.create_series_selectors(flow_frame, "Flow_Rate", self.pumps_list)
+        self.create_series_selectors(flow_frame, "Flow_Rates", self.pumps_list)
         self.tab_frames.append(flow_frame)
         
         # Show first tab by default
@@ -786,6 +786,8 @@ class System2:
                     label.config(text=str(value))
                     # Update the graph data
                     data_type_lower = data_type.lower()
+                    if data_type_lower == "pressure transmitters":
+                        data_type_lower = "pressures"  # dictionary name is pressures_dicts
                     self.graph.update_dict(data_type_lower, equipment_name, value)
                 return _update
 
