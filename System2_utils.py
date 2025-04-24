@@ -5,33 +5,30 @@ import datetime
 import numpy as np
 from collections import deque
 
-from matplotlib.style.core import update_nested_dict
-
-
 class Graph:
-    def __init__(self, temperatures_dict, pressures_dict, balances_dict, flow_rates_dict,
+    def __init__(self, temperature_dict, pressure_dict, balance_dict, flow_rate_dict, 
                  max_points=1000, update_interval=0.5):
         """
         Enhanced graph utility for real-time data visualization.
         
         Args:
-            temperatures_dict: Dictionary of temperature data series
-            pressures_dict: Dictionary of pressure data series
-            balances_dict: Dictionary of balance data series  
-            flow_rates_dict: Dictionary of flow rate data series
+            temperature_dict: Dictionary of temperature data series
+            pressure_dict: Dictionary of pressure data series
+            balance_dict: Dictionary of balance data series  
+            flow_rate_dict: Dictionary of flow rate data series
             max_points: Maximum number of data points to keep per series (default: 1000)
             update_interval: Time between plot updates in seconds (default: 0.5)
         """
-        self.temperatures_dict = temperatures_dict
-        self.pressures_dict = pressures_dict
-        self.balances_dict = balances_dict
-        self.flow_rates_dict = flow_rates_dict
+        self.temperature_dict = temperature_dict
+        self.pressure_dict = pressure_dict
+        self.balance_dict = balance_dict
+        self.flow_rate_dict = flow_rate_dict
         
         self.data_dicts = [
-            ('Temperature', self.temperatures_dict),
-            ('Pressure', self.pressures_dict),
-            ('Balance', self.balances_dict),
-            ('Flow Rate', self.flow_rates_dict)
+            ('Temperature', self.temperature_dict),
+            ('Pressure', self.pressure_dict),
+            ('Balance', self.balance_dict),
+            ('Flow Rate', self.flow_rate_dict)
         ]
         
         # Dictionary mapping plot types to their properties
@@ -59,9 +56,6 @@ class Graph:
         # For tracking time window
         self.start_time = None
         self.time_window = 120  # Default to showing 2 minutes of data
-        
-        # Statistics storage
-        self.statistics = {}
 
     def toggle_all_series(self, dict_type):
         """
@@ -152,30 +146,9 @@ class Graph:
                                           textcoords='offset points',
                                           fontsize=8)
                             
-                            # Calculate statistics for this series
-                            if values:
-                                self.statistics[f"{label}_{name}"] = {
-                                    'mean': np.mean(values),
-                                    'min': min(values),
-                                    'max': max(values),
-                                    'std': np.std(values) if len(values) > 1 else 0
-                                }
-                            
                             plotted = True
                 
                 if plotted:
-                    # Add stats to the plot
-                    stats_text = ""
-                    for series_name, stats in self.statistics.items():
-                        if series_name.startswith(label):
-                            name = series_name.split('_', 1)[1]
-                            stats_text += f"{name}: avg={stats['mean']:.2f}, min={stats['min']:.2f}, max={stats['max']:.2f}\n"
-                    
-                    if stats_text:
-                        p.text(0.02, 0.98, stats_text.strip(), transform=p.transAxes,
-                               fontsize=8, verticalalignment='top', 
-                               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-                    
                     # Set better y limits with padding
                     if self.value_ranges[label]['min'] != float('inf'):
                         data_range = self.value_ranges[label]['max'] - self.value_ranges[label]['min']
@@ -280,7 +253,7 @@ class Graph:
         Get the dictionary corresponding to the specified type.
         
         Args:
-            dict_type: Type of dictionary to get ('temperatures', 'pressures', etc.)
+            dict_type: Type of dictionary to get ('temperature', 'pressure', etc.)
             
         Returns:
             Dictionary object or None if not found
@@ -358,8 +331,6 @@ class Graph:
             # Reset value ranges
             for plot_type in self.value_ranges:
                 self.value_ranges[plot_type] = {'min': float('inf'), 'max': float('-inf')}
-            # Reset statistics
-            self.statistics = {}
             
         elif name is None:
             # Clear all data in the specified dictionary
@@ -370,19 +341,12 @@ class Graph:
                 # Reset value range for this type
                 plot_type = dict_type.capitalize()
                 self.value_ranges[plot_type] = {'min': float('inf'), 'max': float('-inf')}
-                # Reset statistics for this type
-                self.statistics = {k: v for k, v in self.statistics.items() 
-                                  if not k.startswith(plot_type)}
         else:
             # Clear only the specified series
             d = self.get_dict_type(dict_type)
             if d and name in d:
                 d[name][2] = []
                 # We'll recalculate min/max on next update
-                # Remove statistics for this series
-                series_key = f"{dict_type.capitalize()}_{name}"
-                if series_key in self.statistics:
-                    del self.statistics[series_key]
 
     def stop_plotting(self, stop=True):
         """
