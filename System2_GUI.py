@@ -220,14 +220,14 @@ class System2:
         # Format: {series_name: [global_switch(bool), active_status(bool), data_points(list)]}
         
         # Temperature data
-        self.temperature_dict = {}
+        self.temperatures_dict = {}
         for name in self.temperatures_list:
-            self.temperature_dict[name] = [True, True, []]
+            self.temperatures_dict[name] = [True, True, []]
         
         # Pressure data
-        self.pressure_dict = {}
+        self.pressures_dict = {}
         for name in self.pressure_transmitters_list:
-            self.pressure_dict[name] = [True, True, []]
+            self.pressures_dict[name] = [True, True, []]
         
         # Balance data - for PID control
         self.balance_dict = {}
@@ -236,18 +236,18 @@ class System2:
             self.balance_dict[pump_name] = [True, True, []]
         
         # Flow rate data
-        self.flow_rate_dict = {}
+        self.flow_rates_dict = {}
         for pump_name in self.pumps_list:
-            self.flow_rate_dict[pump_name] = [True, True, []]
+            self.flow_rates_dict[pump_name] = [True, True, []]
         
         # Create the graph object
         self.graph = Graph(
-            self.temperature_dict,
-            self.pressure_dict, 
-            self.balance_dict,
-            self.flow_rate_dict,
-            max_points=1000,
-            update_interval=0.5
+            self.temperatures_dict,
+            self.pressures_dict, 
+            self.balances_dict,
+            self.flow_rates_dict,
+            max_points=1000,  # Store up to 1000 data points per series
+            update_interval=0.5  # Update every 0.5 seconds
         )
 
     def create_data_selector_tabs(self, parent_frame):
@@ -264,7 +264,7 @@ class System2:
         self.tab_frames = []
         
         # Add "Balance" to the tab names
-        tab_names = ["Temperature", "Pressure", "Balance", "Flow_Rate"]
+        tab_names = ["Temperature", "Pressure", "Balance", "Flow_Rates"]
         
         for i, name in enumerate(tab_names):
             button = tk.Button(tab_frame, text=name, 
@@ -278,12 +278,12 @@ class System2:
         
         # Create content for temperature tab
         temp_frame = tk.Frame(self.tab_content_frame)
-        self.create_series_selectors(temp_frame, "Temperature", self.temperatures_list)
+        self.create_series_selectors(temp_frame, "Temperatures", self.temperatures_list)
         self.tab_frames.append(temp_frame)
         
         # Create content for pressure tab
         pressure_frame = tk.Frame(self.tab_content_frame)
-        self.create_series_selectors(pressure_frame, "Pressure", self.pressure_transmitters_list)
+        self.create_series_selectors(pressure_frame, "Pressures", self.pressure_transmitters_list)
         self.tab_frames.append(pressure_frame)
         
         # Create content for balance tab - using pump names as balance identifiers
@@ -293,7 +293,7 @@ class System2:
         
         # Create content for flow rate tab
         flow_frame = tk.Frame(self.tab_content_frame)
-        self.create_series_selectors(flow_frame, "Flow_Rate", self.pumps_list)
+        self.create_series_selectors(flow_frame, "Flow_Rates", self.pumps_list)
         self.tab_frames.append(flow_frame)
         
         # Show first tab by default
@@ -459,7 +459,7 @@ class System2:
         tk.Label(frame, text="Pumps", font=("Arial", 16, "underline")).grid(sticky="w", row=0, column=0)
 
         # Column headers
-        headers = ["Connect", "Channel Number", "On", "Off", "Flow_Rate", "Set Flow_Rate"]
+        headers = ["Connect", "Channel Number", "On", "Off", "Flow_Rates", "Set Flow_Rates"]
         for col, text in enumerate(headers, start=1):
             tk.Label(frame, text=text, font=("Arial", 12, "bold")).grid(row=1, column=col)
 
@@ -565,7 +565,7 @@ class System2:
         pump_ser.set_speed(channel_num, flow_rate)
         
         # Update the graph with the new 
-        self.graph.update_dict("flow_rate", self.pumps_list[pump_index], flow_rate)
+        self.graph.update_dict("flow_rates", self.pumps_list[pump_index], flow_rate)
     
     def create_pid_control_ui(self):
         """Create the PID control UI elements."""
@@ -1125,6 +1125,8 @@ class System2:
                     label.config(text=str(value))
                     # Update the graph data
                     data_type_lower = data_type.lower()
+                    if data_type_lower == "pressure transmitters":
+                        data_type_lower = "pressures"  # dictionary name is pressures_dicts
                     self.graph.update_dict(data_type_lower, equipment_name, value)
                 return _update
 

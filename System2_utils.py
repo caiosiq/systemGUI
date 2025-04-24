@@ -5,30 +5,33 @@ import datetime
 import numpy as np
 from collections import deque
 
+from matplotlib.style.core import update_nested_dict
+
+
 class Graph:
-    def __init__(self, temperature_dict, pressure_dict, balance_dict, flow_rate_dict, 
+    def __init__(self, temperatures_dict, pressures_dict, balances_dict, flow_rates_dict,
                  max_points=1000, update_interval=0.5):
         """
         Enhanced graph utility for real-time data visualization.
         
         Args:
-            temperature_dict: Dictionary of temperature data series
-            pressure_dict: Dictionary of pressure data series
-            balance_dict: Dictionary of balance data series  
-            flow_rate_dict: Dictionary of flow rate data series
+            temperatures_dict: Dictionary of temperature data series
+            pressures_dict: Dictionary of pressure data series
+            balances_dict: Dictionary of balance data series  
+            flow_rates_dict: Dictionary of flow rate data series
             max_points: Maximum number of data points to keep per series (default: 1000)
             update_interval: Time between plot updates in seconds (default: 0.5)
         """
-        self.temperature_dict = temperature_dict
-        self.pressure_dict = pressure_dict
-        self.balance_dict = balance_dict
-        self.flow_rate_dict = flow_rate_dict
+        self.temperatures_dict = temperatures_dict
+        self.pressures_dict = pressures_dict
+        self.balances_dict = balances_dict
+        self.flow_rates_dict = flow_rates_dict
         
         self.data_dicts = [
-            ('Temperature', self.temperature_dict),
-            ('Pressure', self.pressure_dict),
-            ('Balance', self.balance_dict),
-            ('Flow Rate', self.flow_rate_dict)
+            ('Temperature', self.temperatures_dict),
+            ('Pressure', self.pressures_dict),
+            ('Balance', self.balances_dict),
+            ('Flow Rate', self.flow_rates_dict)
         ]
         
         # Dictionary mapping plot types to their properties
@@ -277,7 +280,7 @@ class Graph:
         Get the dictionary corresponding to the specified type.
         
         Args:
-            dict_type: Type of dictionary to get ('temperature', 'pressure', etc.)
+            dict_type: Type of dictionary to get ('temperatures', 'pressures', etc.)
             
         Returns:
             Dictionary object or None if not found
