@@ -15,6 +15,7 @@ class PumpControl:
         self.off_button = off_button  # Off button
         self.channel_var = channel_var  # Channel number input variable
         self.flow_var = flow_var  #  input variable
+        self.serial_obj = None
 
     def set_serial_obj(self, serial_obj):
         print('Setting pump serial object')
@@ -479,6 +480,9 @@ class System2:
             # Store elements in the dictionary
             self.pump_controls[i] = PumpControl(connect_btn, on_btn, off_btn, channel_var, flow_var)
 
+            #assign pump port var
+            self.pump_port_vars[i] = tk.IntVar(value = addresses["Pumps"][i])
+
             # Place elements in the grid
             connect_btn.grid(row=i + 2, column=1, padx=10)
             channel_entry.grid(row=i + 2, column=2, padx=10)
@@ -519,6 +523,7 @@ class System2:
             com_number = str(self.pump_port_vars[pump_index].get())
             pump_ser = Pump(com_number)
             pump_ser.set_independent_channel_control()
+            print('here, connecting', pump_ser)
             pump.set_serial_obj(pump_ser)
 
         else:  # If already connected
@@ -1136,6 +1141,34 @@ class System2:
             t = threading.Thread(target=lambda: plc_object.read_float(callback, reg1, reg1+1))
             t.daemon = True
             t.start()
+
+    def write_float_values(self, equipment_type, equipment_name, value):
+        """
+        Function to write float values to PLC.
+        equipment type will be "Pressure Regulators" or "Stirrers"
+        """
+        if equipment_type == "Pressure Regulators":
+            plc_object = self.pressure_regulator_plc
+        elif equipment_type == "Stirrers":
+            plc_object = self.stirrer_plc
+
+        reg1 = self.register_dictionary[equipment_type][equipment_name].get()
+        plc_object.write_float(reg1, value)
+
+    def toggle_onoff(self, equipment_type, equipment_name, boolean):
+        """
+        Turn equipment on or off
+        equipment type is "Pressure In/Outs" or "Valves"
+        """
+        if equipment_type == "Pressure In/Outs":
+            plc_object = self.pressure_inout_plc
+        elif equipment_type == "Valves":
+            plc_object = self.valve_plc
+        elif equipment_type == "Drums":
+            plc_object = self.drum_plc
+
+        address = self.register_dictionary[equipment_type][equipment_name].get()
+        plc_object.write_onoff(address, boolean)
     
     def exit_shortcut(self, event):
         """Exit the GUI when the escape key is pressed."""
