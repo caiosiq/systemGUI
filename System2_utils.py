@@ -6,37 +6,37 @@ import numpy as np
 from collections import deque
 
 class Graph:
-    def __init__(self, temperature_dict, pressure_dict, balance_dict, flow_rate_dict, 
+    def __init__(self, temperatures_dict, pressures_dict, balances_dict, flow_rates_dict, 
                  max_points=1000, update_interval=0.5):
         """
         Enhanced graph utility for real-time data visualization.
         
         Args:
-            temperature_dict: Dictionary of temperature data series
-            pressure_dict: Dictionary of pressure data series
-            balance_dict: Dictionary of balance data series  
-            flow_rate_dict: Dictionary of flow rate data series
+            temperatures_dict: Dictionary of temperature data series
+            pressures_dict: Dictionary of pressure data series
+            balances_dict: Dictionary of balance data series  
+            flow_rates_dict: Dictionary of flow rate data series
             max_points: Maximum number of data points to keep per series (default: 1000)
             update_interval: Time between plot updates in seconds (default: 0.5)
         """
-        self.temperature_dict = temperature_dict
-        self.pressure_dict = pressure_dict
-        self.balance_dict = balance_dict
-        self.flow_rate_dict = flow_rate_dict
+        self.temperatures_dict = temperatures_dict
+        self.pressures_dict = pressures_dict
+        self.balances_dict = balances_dict
+        self.flow_rates_dict = flow_rates_dict
         
         self.data_dicts = [
-            ('Temperature', self.temperature_dict),
-            ('Pressure', self.pressure_dict),
-            ('Balance', self.balance_dict),
-            ('Flow Rate', self.flow_rate_dict)
+            ('Temperatures', self.temperatures_dict),
+            ('Pressures', self.pressures_dict),
+            ('Balances', self.balances_dict),
+            ('Flow_Rates', self.flow_rates_dict)
         ]
         
         # Dictionary mapping plot types to their properties
         self.plot_properties = {
-            'Temperature': {'index': 0, 'ylabel': 'Temperature (°C)', 'color_map': 'inferno'},
-            'Pressure': {'index': 1, 'ylabel': 'Pressure (psi)', 'color_map': 'viridis'},
-            'Balance': {'index': 2, 'ylabel': 'Balance (g)', 'color_map': 'cividis'},
-            'Flow Rate': {'index': 3, 'ylabel': 'Flow Rate (mL/min)', 'color_map': 'plasma'}
+            'Temperatures': {'index': 0, 'ylabel': 'Temperature (°C)', 'color_map': 'inferno'},
+            'Pressures': {'index': 1, 'ylabel': 'Pressure (psi)', 'color_map': 'viridis'},
+            'Balances': {'index': 2, 'ylabel': 'Balance (g)', 'color_map': 'cividis'},
+            'Flow_Rates': {'index': 3, 'ylabel': 'Flow_Rate (mL/min)', 'color_map': 'plasma'}
         }
         
         self.color_map = {}
@@ -47,10 +47,10 @@ class Graph:
         
         # For tracking min/max values for each plot type
         self.value_ranges = {
-            'Temperature': {'min': float('inf'), 'max': float('-inf')},
-            'Pressure': {'min': float('inf'), 'max': float('-inf')},
-            'Balance': {'min': float('inf'), 'max': float('-inf')},
-            'Flow Rate': {'min': float('inf'), 'max': float('-inf')}
+            'Temperatures': {'min': float('inf'), 'max': float('-inf')},
+            'Pressures': {'min': float('inf'), 'max': float('-inf')},
+            'Balances': {'min': float('inf'), 'max': float('-inf')},
+            'Flow_Rates': {'min': float('inf'), 'max': float('-inf')}
         }
         
         # For tracking time window
@@ -62,7 +62,7 @@ class Graph:
         Toggle visibility of all data series in a specific category.
         
         Args:
-            dict_type: Type of dictionary to toggle ('temperature', 'pressure', etc.)
+            dict_type: Type of dictionary to toggle ('temperatures', 'pressures', etc.)
         """
         d = self.get_dict_type(dict_type)
         if d:
@@ -101,6 +101,7 @@ class Graph:
             
             # Set up plots
             for label, properties in self.plot_properties.items():
+                label = label[:-1] # remove s from the end of the label
                 idx = properties['index']
                 plots[idx].set_title(f'{label} Over Time')
                 plots[idx].set_xlabel('Time (s)')
@@ -253,7 +254,7 @@ class Graph:
         Get the dictionary corresponding to the specified type.
         
         Args:
-            dict_type: Type of dictionary to get ('temperature', 'pressure', etc.)
+            dict_type: Type of dictionary to get ('temperatures', 'pressures', etc.)
             
         Returns:
             Dictionary object or None if not found

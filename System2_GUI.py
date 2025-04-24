@@ -230,10 +230,10 @@ class System2:
             self.pressures_dict[name] = [True, True, []]
         
         # Balance data - for PID control
-        self.balance_dict = {}
+        self.balances_dict = {}
         # Add entries for each pump (assuming each pump has an associated balance)
         for pump_name in self.pumps_list:
-            self.balance_dict[pump_name] = [True, True, []]
+            self.balances_dict[pump_name] = [True, True, []]
         
         # Flow rate data
         self.flow_rates_dict = {}
@@ -264,7 +264,7 @@ class System2:
         self.tab_frames = []
         
         # Add "Balance" to the tab names
-        tab_names = ["Temperature", "Pressure", "Balance", "Flow_Rates"]
+        tab_names = ["Temperatures", "Pressures", "Balances", "Flow_Rates"]
         
         for i, name in enumerate(tab_names):
             button = tk.Button(tab_frame, text=name, 
@@ -288,7 +288,7 @@ class System2:
         
         # Create content for balance tab - using pump names as balance identifiers
         balance_frame = tk.Frame(self.tab_content_frame)
-        self.create_series_selectors(balance_frame, "Balance", self.pumps_list)
+        self.create_series_selectors(balance_frame, "Balances", self.pumps_list)
         self.tab_frames.append(balance_frame)
         
         # Create content for flow rate tab
