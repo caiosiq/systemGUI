@@ -4,6 +4,11 @@ from matplotlib.dates import DateFormatter, MinuteLocator
 import datetime
 import numpy as np
 from collections import deque
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
+import datetime
+import os
 
 class Graph:
     def __init__(self, temperatures_dict, pressures_dict, balances_dict, flow_rates_dict, 
@@ -55,7 +60,7 @@ class Graph:
         
         # For tracking time window
         self.start_time = None
-        self.time_window = 120  # Default to showing 2 minutes of data
+        self.time_window = 120  # Default time window in seconds
 
     def toggle_all_series(self, dict_type):
         """
@@ -272,49 +277,139 @@ class Graph:
 
     def export_data(self, filename=None):
         """
-        Export all current data to a CSV file.
+        Export all current data to a nicely formatted Excel file without summary page.
+        Only includes data sheets for each measurement type.
         
         Args:
-            filename: Output filename (default: "system2_data_YYYY-MM-DD_HH-MM-SS.csv")
+            filename: Output filename (default: "system2_data_YYYY-MM-DD_HH-MM-SS.xlsx")
+            
+        Returns:
+            The filename of the exported file
         """
         if filename is None:
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            filename = f"system2_data_{timestamp}.csv"
+            filename = f"system2_data_{timestamp}.xlsx"
         
-        with open(filename, 'w') as f:
-            # Write header
-            header = ["Timestamp"]
-            for label, data_dict in self.data_dicts:
-                for name in data_dict:
-                    header.append(f"{label}_{name}")
-            f.write(",".join(header) + "\n")
+        # Create a new workbook and select the active worksheet
+        wb = openpyxl.Workbook()
+        
+        # Create separate sheets for each data type
+        data_types = ["Temperatures", "Pressures", "Balances", "Flow_Rates"]
+        
+        # Dictionary to hold timestamps for each data type
+        all_timestamps_by_type = {}
+        
+        # First, collect all timestamps for each data type
+        for data_type in data_types:
+            dict_name = f"{data_type.lower()}_dict"
+            data_dict = getattr(self, dict_name)  # Access data directly from self
             
-            # Collect all timestamps
-            all_timestamps = set()
-            for label, data_dict in self.data_dicts:
-                for name, var_value in data_dict.items():
-                    if var_value[0] and var_value[1]:
-                        all_timestamps.update([t for t, v in var_value[2] if t is not None])
+            # Collect all timestamps for this data type
+            timestamps = set()
+            for name, var_value in data_dict.items():
+                if var_value[0] and var_value[1]:  # If series is active and visible
+                    timestamps.update([t for t, v in var_value[2] if t is not None])
             
-            all_timestamps = sorted(all_timestamps)
+            all_timestamps_by_type[data_type] = sorted(timestamps)
+        
+        # Now create and populate each sheet
+        for i, data_type in enumerate(data_types):
+            # Create a sheet for this data type
+            if i == 0:  # Use the default sheet for the first data type
+                ws = wb.active
+                ws.title = data_type
+            else:
+                ws = wb.create_sheet(title=data_type)
             
-            # Write data rows
-            for ts in all_timestamps:
-                row = [str(ts)]
-                for label, data_dict in self.data_dicts:
-                    for name, var_value in data_dict.items():
-                        # Find the value at this timestamp or closest before it
-                        value = None
-                        if var_value[0] and var_value[1]:
-                            for t, v in var_value[2]:
-                                if t == ts:
-                                    value = v
-                                    break
-                        row.append(str(value) if value is not None else "")
+            # Reference the dictionary
+            dict_name = f"{data_type.lower()}_dict"
+            data_dict = getattr(self, dict_name)
+            
+            # Get sorted timestamps
+            timestamps = all_timestamps_by_type[data_type]
+            
+            # Style configuration
+            header_font = Font(bold=True, size=12)
+            header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+            header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            thin_border = Border(
+                left=Side(style='thin'), 
+                right=Side(style='thin'), 
+                top=Side(style='thin'), 
+                bottom=Side(style='thin')
+            )
+            
+            # First row: Headers
+            # Add timestamp column header
+            ws.cell(row=1, column=1).value = "Timestamp"
+            ws.cell(row=1, column=2).value = "Date/Time"
+            ws.cell(row=1, column=1).font = header_font
+            ws.cell(row=1, column=2).font = header_font
+            ws.cell(row=1, column=1).fill = header_fill
+            ws.cell(row=1, column=2).fill = header_fill
+            ws.cell(row=1, column=1).alignment = header_alignment
+            ws.cell(row=1, column=2).alignment = header_alignment
+            ws.cell(row=1, column=1).border = thin_border
+            ws.cell(row=1, column=2).border = thin_border
+            
+            # Add data series headers
+            col_idx = 3
+            series_indices = {}  # To track column indices for each series
+            
+            for name in data_dict:
+                if data_dict[name][0]:  # If the series is active
+                    ws.cell(row=1, column=col_idx).value = name
+                    ws.cell(row=1, column=col_idx).font = header_font
+                    ws.cell(row=1, column=col_idx).fill = header_fill
+                    ws.cell(row=1, column=col_idx).alignment = header_alignment
+                    ws.cell(row=1, column=col_idx).border = thin_border
+                    series_indices[name] = col_idx
+                    col_idx += 1
+            
+            # Data rows
+            for row_idx, ts in enumerate(timestamps, start=2):
+                # Convert timestamp to readable datetime
+                dt = datetime.datetime.fromtimestamp(ts)
+                formatted_dt = dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
                 
-                f.write(",".join(row) + "\n")
+                # Add timestamp
+                ws.cell(row=row_idx, column=1).value = ts
+                ws.cell(row=row_idx, column=2).value = formatted_dt
+                ws.cell(row=row_idx, column=1).border = thin_border
+                ws.cell(row=row_idx, column=2).border = thin_border
+                
+                # Add values for each series
+                for name, col_idx in series_indices.items():
+                    # Find the value at this timestamp
+                    value = None
+                    for t, v in data_dict[name][2]:
+                        if t == ts:
+                            value = v
+                            break
+                    
+                    # Add to the sheet
+                    if value is not None:
+                        ws.cell(row=row_idx, column=col_idx).value = value
+                        ws.cell(row=row_idx, column=col_idx).number_format = '0.0000'  # Format as number with 4 decimals
+                    ws.cell(row=row_idx, column=col_idx).border = thin_border
+            
+            # Auto-adjust column widths
+            for col_idx in range(1, len(series_indices) + 3):
+                ws.column_dimensions[get_column_letter(col_idx)].width = 15
+            
+            # Freeze the header row
+            ws.freeze_panes = "A2"
         
-        return filename
+        # Save the workbook
+        try:
+            wb.save(filename)
+            return filename
+        except PermissionError:
+            # If file is open in another program, create a new filename
+            base_name, ext = os.path.splitext(filename)
+            new_filename = f"{base_name}_new{ext}"
+            wb.save(new_filename)
+            return new_filename
 
     def clear_data(self, dict_type=None, name=None):
         """

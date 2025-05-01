@@ -484,7 +484,7 @@ class System2:
             self.time_window_var.set("120")  # Reset to default
 
     def export_graph_data(self):
-        """Export graph data to CSV"""
+        """Export graph data to excel"""
         filename = self.graph.export_data()
         tk.messagebox.showinfo("Data Exported", f"Data exported to {filename}")
 
