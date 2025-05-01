@@ -351,29 +351,56 @@ class System2:
         if data_type.lower() in ["flow_rates", "balances"]:
             expanded_series_list = []
             for name in series_list:
+                # Create a frame for each pump's channels to keep them on one row
+                pump_frame = tk.Frame(checkbox_frame)
+                pump_frame.pack(anchor="w", pady=2)
+                
+                # Add pump label
+                tk.Label(pump_frame, text=f"{name}:", width=8, anchor="w").pack(side="left", padx=(0, 5))
+                
                 for channel in range(1, 5):  # 4 channels
-                    expanded_series_list.append(f"{name} Ch{channel}")
-        
-        # Create a checkbox for each series
-        for i, name in enumerate(expanded_series_list):
-            # Get the dictionary for this data type
-            data_dict = getattr(self.graph, f"{data_type.lower()}_dict")
-            
-            # Initialize checkbox variable based on current series visibility
-            is_visible = data_dict[name][1] if name in data_dict else True
-            
-            # Create variable and store it
-            var = tk.BooleanVar(value=is_visible)
-            self.checkbox_vars[f"{data_type.lower()}_{name}"] = var
-            
-            # Create the checkbox with a command that updates visibility
-            cb = tk.Checkbutton(
-                checkbox_frame, 
-                text=name, 
-                variable=var,
-                command=lambda n=name, t=data_type.lower(), v=var: self.update_series_visibility(t, n, v.get())
-            )
-            cb.grid(row=i//3, column=i%3, sticky="w", padx=10, pady=3)
+                    channel_name = f"{name} Ch{channel}"
+                    expanded_series_list.append(channel_name)
+                    
+                    # Get the dictionary for this data type
+                    data_dict = getattr(self.graph, f"{data_type.lower()}_dict")
+                    
+                    # Initialize checkbox variable based on current series visibility
+                    is_visible = data_dict[channel_name][1] if channel_name in data_dict else True
+                    
+                    # Create variable and store it
+                    var = tk.BooleanVar(value=is_visible)
+                    self.checkbox_vars[f"{data_type.lower()}_{channel_name}"] = var
+                    
+                    # Create the checkbox with a command that updates visibility - pack them side by side
+                    cb = tk.Checkbutton(
+                        pump_frame, 
+                        text=f"Ch{channel}", 
+                        variable=var,
+                        command=lambda n=channel_name, t=data_type.lower(), v=var: self.update_series_visibility(t, n, v.get())
+                    )
+                    cb.pack(side="left", padx=5)
+        else:
+            # For temperatures and pressures - use the original grid layout
+            for i, name in enumerate(expanded_series_list):
+                # Get the dictionary for this data type
+                data_dict = getattr(self.graph, f"{data_type.lower()}_dict")
+                
+                # Initialize checkbox variable based on current series visibility
+                is_visible = data_dict[name][1] if name in data_dict else True
+                
+                # Create variable and store it
+                var = tk.BooleanVar(value=is_visible)
+                self.checkbox_vars[f"{data_type.lower()}_{name}"] = var
+                
+                # Create the checkbox with a command that updates visibility
+                cb = tk.Checkbutton(
+                    checkbox_frame, 
+                    text=name, 
+                    variable=var,
+                    command=lambda n=name, t=data_type.lower(), v=var: self.update_series_visibility(t, n, v.get())
+                )
+                cb.grid(row=i//3, column=i%3, sticky="w", padx=10, pady=3)
 
     def update_series_visibility(self, data_type, series_name, is_visible):
         """
