@@ -571,6 +571,7 @@ class System2:
             com_number = str(self.pump_port_vars[pump_index].get())
             pump_ser = Pump(com_number)
             pump_ser.set_independent_channel_control()
+            print('here, connecting', pump_ser)
             pump.set_serial_obj(pump_ser)
 
         else:  # If already connected
