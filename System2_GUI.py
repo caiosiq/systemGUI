@@ -7,20 +7,16 @@ from System2_utils import Graph
 from pid_control import PIDControl
 import serial
 
-class PumpControl:
-    """Encapsulates all UI elements for a pump with multiple channels."""
-    def __init__(self, connect_button):
-        self.connect_button = connect_button
-        self.channels = {}
-        self.serial_obj = None
 
-    def add_channel(self, channel_num, on_button, off_button, flow_var):
-        """Add controls for a specific channel"""
-        self.channels[channel_num] = {
-            'on_button': on_button,
-            'off_button': off_button,
-            'flow_var': flow_var
-        }
+class PumpControl:
+    """Encapsulates all UI elements for a pump."""
+
+    def __init__(self, connect_button):
+        self.connect_button = connect_button  # Connect button
+        self.channel_dict = {} #dictionary of channel id mapped to a map of on button, off button, flow rate var
+
+    def add_channel(self, channel_id, on_button, off_button, flow_var):
+        self.channel_dict[channel_id] = {"on_btn": on_button, "off_btn": off_button, "flow_var": flow_var}
 
     def set_serial_obj(self, serial_obj):
         print('Setting pump serial object')
@@ -29,6 +25,7 @@ class PumpControl:
 # holds all pump and plc addresses
 addresses = {
     'Pumps': [9],
+    'Balances': [5],
     'Temperatures': [28710, 28712, 28714],
     'Pressure Transmitters': [28750, 28752, 28754],
     'Pressure Regulators': [28770, 28772],
@@ -105,6 +102,7 @@ class System2:
         self.pumps_list = ["Pump 1"]
         self.pump_connect_vars = [False] * len(self.pumps_list)
         self.pump_port_vars = [None] * len(self.pumps_list)
+        self.pump_objects = {}
         self.pump_controls = {}  # Dictionary to store UI elements
         self.create_pump_ui()
 
@@ -495,67 +493,65 @@ class System2:
 
     # pumps
     def create_pump_ui(self):
-        """Creates UI elements for pumps."""
+        """Creates UI elements for pumps with the updated PumpControl class structure."""
         frame = tk.Frame(self.equipment_frame)
         tk.Label(frame, text="Pumps", font=("Arial", 16, "underline")).grid(sticky="w", row=0, column=0)
 
         # Column headers
-        headers = ["Connect", "Channel Number", "On", "Off", "Flow_Rates", "Set Flow_Rates"]
+        headers = ["Connect", "Channel Number", "On", "Off", "Flow Rates", "Set Flow Rates"]
         for col, text in enumerate(headers, start=1):
             tk.Label(frame, text=text, font=("Arial", 12, "bold")).grid(row=1, column=col)
 
         row_index = 2
-        self.pump_controls = {}  # Reset pump controls dictionary
-        
+
         for i, pump_name in enumerate(self.pumps_list):
             # Add pump label for whole pump
             tk.Label(frame, text=pump_name, font=("Arial", 11, "bold")).grid(
                 row=row_index, column=0, sticky="w", rowspan=4)
-            
+
             # Create a connect button for the whole pump
             connect_btn = tk.Button(
-                frame, text="Disconnected", width=12, 
+                frame, text="Disconnected", width=12,
                 command=lambda i=i: self.pump_connect(i))
             connect_btn.grid(row=row_index, column=1, padx=10, rowspan=4)
-            
+
+            # Create a PumpControl object for this pump
+            pump_control = PumpControl(connect_btn)
+            self.pump_objects[i] = pump_control
+
             # Create controls for each channel
             for j in range(4):
                 channel_num = j + 1
                 channel_id = f"{i}_{j}"  # Unique ID for each channel
-                
+
                 # Channel label
                 channel_label = tk.Label(frame, text=f"{channel_num}")
                 channel_label.grid(row=row_index + j, column=2, padx=10)
-                
-                # On/Off buttons 
+
+                # On/Off buttons
                 on_btn = tk.Button(
-                    frame, text="On", width=7, 
+                    frame, text="On", width=7, state=tk.DISABLED,
                     command=lambda i=i, ch=channel_num: self.pump_on(i, ch))
                 on_btn.grid(row=row_index + j, column=3, padx=10)
-                
+
                 off_btn = tk.Button(
-                    frame, text="Off", width=7, 
+                    frame, text="Off", width=7, state=tk.DISABLED,
                     command=lambda i=i, ch=channel_num: self.pump_off(i, ch))
                 off_btn.grid(row=row_index + j, column=4, padx=10)
-                
+
                 # Flow rate entry and set button
                 flow_var = tk.StringVar()
                 flow_entry = tk.Entry(frame, textvariable=flow_var, width=15)
                 flow_entry.grid(row=row_index + j, column=5, padx=10)
-                
+
                 set_flow_btn = tk.Button(
-                    frame, text="Set", width=5, 
+                    frame, text="Set", width=5,
                     command=lambda i=i, ch=channel_num, v=flow_var: self.pump_set_flow_rate(i, ch, v))
                 set_flow_btn.grid(row=row_index + j, column=6)
-                
-                # Store controls for this channel
-                self.pump_controls[channel_id] = {
-                    'pump_index': i,
-                    'channel': channel_num,
-                    'on_button': on_btn,
-                    'off_button': off_btn,
-                    'flow_var': flow_var
-                }
+
+                # Add this channel to the pump control object
+                pump_control.add_channel(channel_id, on_btn, off_btn, flow_var)
+
             row_index += 4
 
             # Add a separator between pumps
@@ -585,66 +581,141 @@ class System2:
 
     def pump_connect(self, pump_index):
         """Handles connecting/disconnecting a pump."""
-        pump = self.pump_controls[pump_index]
-
         if not self.pump_connect_vars[pump_index]:  # If not connected
             if not self.pump_port_vars[pump_index]:
-                print("Please enter a port number.")
-                return
-            
-            self.pump_connect_vars[pump_index] = True
-            self.update_button_colors(pump_index, "connected")
+                address = addresses["Pumps"][pump_index]
+                self.pump_port_vars[pump_index] = tk.IntVar(value=address)
 
-            com_number = str(self.pump_port_vars[pump_index].get())
-            pump_ser = Pump(com_number)
-            pump_ser.set_independent_channel_control()
-            print('here, connecting', pump_ser)
-            pump.set_serial_obj(pump_ser)
+            try:
+                # Get the port number from the pump port variable
+                com_number = str(self.pump_port_vars[pump_index].get())
+
+                # Create pump serial object
+                pump_ser = Pump(com_number)
+                pump_ser.set_independent_channel_control()
+                print(f'Connecting pump {pump_index} on COM{com_number}')
+
+                # Update connection state
+                self.pump_connect_vars[pump_index] = True
+
+                # Get the PumpControl object
+                pump_control = self.pump_objects[pump_index]
+
+                # Update the button
+                pump_control.connect_button.config(bg="LightSkyBlue1", text="Connected")
+
+                # Set the serial object
+                pump_control.set_serial_obj(pump_ser)
+
+                # Enable all channel controls for this pump
+                for channel_id, controls in pump_control.channel_dict.items():
+                    controls["on_btn"].config(state=tk.NORMAL)
+                    controls["off_btn"].config(state=tk.NORMAL)
+
+            except Exception as e:
+                print(f"Error connecting pump: {e}")
+                tk.messagebox.showerror("Connection Error", f"Failed to connect pump: {e}")
 
         else:  # If already connected
-            self.pump_connect_vars[pump_index] = False
-            self.update_button_colors(pump_index, "disconnected")
+            try:
+                # Update connection state
+                self.pump_connect_vars[pump_index] = False
 
-            pump_ser = pump.serial_obj
-            del pump_ser # equivalent to pump_ser.close()
+                # Get the PumpControl object
+                pump_control = self.pump_objects[pump_index]
+
+                # Update the button
+                pump_control.connect_button.config(bg="SystemButtonFace", text="Disconnected")
+
+                # Disable all channel controls for this pump
+                for channel_id, controls in pump_control.channel_dict.items():
+                    controls["on_btn"].config(state=tk.DISABLED)
+                    controls["off_btn"].config(state=tk.DISABLED)
+
+                # Clean up serial connection
+                if hasattr(pump_control, 'serial_obj'):
+                    delattr(pump_control, 'serial_obj')
+
+            except Exception as e:
+                print(f"Error disconnecting pump: {e}")
 
     def pump_on(self, pump_index, channel):
         """Turns on the specified pump channel if connected."""
         if not self.pump_connect_vars[pump_index]:
             return  # Ignore if pump is not connected
 
-        self.update_button_colors(pump_index, "on", channel)
-        pump = self.pump_controls[pump_index]
-        pump_ser = pump.serial_obj
+        try:
+            # Get the PumpControl object
+            pump_control = self.pump_objects[pump_index]
 
-        pump_ser.start_channel(channel)
+            # Find the channel controls
+            channel_id = f"{pump_index}_{channel - 1}"  # Convert 1-based channel to 0-based index
+            channel_controls = pump_control.channel_dict.get(channel_id)
+
+            if not channel_controls:
+                print(f"Channel controls not found for channel {channel}")
+                return
+
+            # Turn on the channel
+            pump_control.serial_obj.start_channel(channel)
+
+            # Update the UI
+            channel_controls["on_btn"].config(bg="pale green")
+            channel_controls["off_btn"].config(bg="SystemButtonFace")
+
+        except Exception as e:
+            print(f"Error turning on pump channel: {e}")
 
     def pump_off(self, pump_index, channel):
         """Turns off the specified pump channel if connected."""
         if not self.pump_connect_vars[pump_index]:
             return  # Ignore if pump is not connected
 
-        self.update_button_colors(pump_index, "off", channel)
-        pump = self.pump_controls[pump_index]
-        pump_ser = pump.serial_obj
+        try:
+            # Get the PumpControl object
+            pump_control = self.pump_objects[pump_index]
 
-        pump_ser.stop_channel(channel)
+            # Find the channel controls
+            channel_id = f"{pump_index}_{channel - 1}"  # Convert 1-based channel to 0-based index
+            channel_controls = pump_control.channel_dict.get(channel_id)
+
+            if not channel_controls:
+                print(f"Channel controls not found for channel {channel}")
+                return
+
+            # Turn off the channel
+            pump_control.serial_obj.stop_channel(channel)
+
+            # Update the UI
+            channel_controls["off_btn"].config(bg="IndianRed1")
+            channel_controls["on_btn"].config(bg="SystemButtonFace")
+
+        except Exception as e:
+            print(f"Error turning off pump channel: {e}")
 
     def pump_set_flow_rate(self, pump_index, channel, flow_var):
         """Sets the flow rate for the specified pump channel."""
         if not self.pump_connect_vars[pump_index]:
             return  # Ignore if not connected
 
-        pump = self.pump_controls[pump_index]
-        pump_ser = pump.serial_obj
-        flow_rate = float(flow_var.get())
+        try:
+            # Get the PumpControl object
+            pump_control = self.pump_objects[pump_index]
 
-        pump_ser.set_speed(channel, flow_rate)
-        
-        # Update the graph with the new flow rate 
-        # Use a channel-specific identifier in the graph
-        channel_name = f"{self.pumps_list[pump_index]} Ch{channel}"
-        self.graph.update_dict("flow_rates", channel_name, flow_rate)
+            # Get flow rate from entry
+            flow_rate = float(flow_var.get())
+
+            # Set flow rate
+            pump_control.serial_obj.set_speed(channel, flow_rate)
+
+            # Update the graph with the new flow rate
+            channel_name = f"{self.pumps_list[pump_index]} Ch{channel}"
+            self.graph.update_dict("flow_rates", channel_name, flow_rate)
+
+        except ValueError:
+            tk.messagebox.showerror("Error", "Please enter a valid flow rate")
+        except Exception as e:
+            print(f"Error setting flow rate: {e}")
     
     def create_pid_control_ui(self):
         """Create the PID control UI elements with support for multiple channels per pump."""
@@ -667,7 +738,7 @@ class System2:
 
         row_index = 1
         for pump_name in self.pumps_list:
-            self.pid_port_vars[pump_name] = tk.StringVar(value="19")  # Default
+            self.pid_port_vars[pump_name] = tk.StringVar(value="5")  # Default
 
             for j in range(4):
                 channel = j + 1
@@ -744,21 +815,21 @@ class System2:
         parts = channel_id.split('_Ch')
         pump_name = parts[0]
         channel = int(parts[1])
-        
+
         # Get pump index
         pump_index = self.pumps_list.index(pump_name)
-        
+
         # Verify the pump is connected
         if not self.pump_connect_vars[pump_index]:
             tk.messagebox.showerror("Error", f"{pump_name} is not connected. Please connect the pump first.")
             return
-        
-        # Get the balance port - now from the pump-level variable
+
+        # Get the balance port
         balance_port = self.pid_port_vars[pump_name].get()
         if not balance_port:
             tk.messagebox.showerror("Error", "Please enter a balance port number.")
             return
-        
+
         try:
             # Connect to balance
             balance_ser = serial.Serial(
@@ -769,14 +840,14 @@ class System2:
                 stopbits=serial.STOPBITS_ONE,
                 bytesize=serial.EIGHTBITS,
             )
-            
-            # Get pump serial object
-            pump = self.pump_controls[pump_index]
-            pump_ser = pump.serial_obj
-            
+
+            # Get the PumpControl object and its serial object
+            pump_control = self.pump_objects[pump_index]
+            pump_ser = pump_control.serial_obj
+
             # Get pump type - for this implementation we're using REGLO pumps
             pump_type = "REGLO"
-            
+
             # Create PID controller configuration
             pid_config = {
                 'set_point': self.pid_setpoint_vars[channel_id].get(),
@@ -785,7 +856,7 @@ class System2:
                 'kd': self.pid_kd_vars[channel_id].get(),
                 'integral_error_limit': self.pid_integral_limit_var.get()
             }
-            
+
             # Create PID controller with channel-specific name
             pid_controller = PIDControl(
                 balance_ser,
@@ -794,32 +865,32 @@ class System2:
                 channel_id,  # Use channel_id as the name for the controller
                 self.graph
             )
-            
+
             # Set controller parameters
             pid_controller.set_controller_and_matrix(
                 pid_config,
                 self.pid_data_points_var.get()
             )
-            
+
             # Start the PID control thread
             success = pid_controller.start()
-            
+
             if success:
                 # Store the controller
                 self.pid_controllers[channel_id] = pid_controller
-                
+
                 # Update status
                 self.pid_status_vars[channel_id].set("Active")
-                
-                # Update the button - now use the dictionary
+
+                # Update the button
                 if hasattr(self, 'pid_buttons') and channel_id in self.pid_buttons:
                     self.pid_buttons[channel_id].config(text="Stop PID", bg="IndianRed1")
-                
+
                 tk.messagebox.showinfo("PID Control", f"PID control started for {channel_id}")
             else:
                 tk.messagebox.showerror("Error", f"Failed to start PID control for {channel_id}")
                 balance_ser.close()
-                
+
         except Exception as e:
             tk.messagebox.showerror("Error", f"Error starting PID control: {str(e)}")
 
@@ -1094,9 +1165,9 @@ class System2:
             pump_port_entry.grid(row=i + 1, column=1, padx=5)
             self.pump_port_vars[i] = self.pump_port_var
 
-            # Balance port entry - default to 19
+            # Balance port entry
             if name not in self.balance_port_vars:
-                self.balance_port_vars[name] = tk.StringVar(value="19")
+                self.balance_port_vars[name] = tk.StringVar(value=addresses["Balances"][i])
             balance_port_entry = tk.Entry(pump_balance_frame, textvariable=self.balance_port_vars[name])
             balance_port_entry.grid(row=i + 1, column=2, padx=5)
             
@@ -1232,7 +1303,14 @@ class System2:
         sys.exit(0)  # Force exit the Python process
 
     def test(self):
+        p = f'COM{5}'
+        ser = serial.Serial(port=p, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
+                            bytesize=serial.EIGHTBITS, timeout=0.2)
+        print("connected to: " + ser.portstr)
+        from time import sleep
+        sleep(2)
+        ser.close()
+        print(f'Closed {ser.portstr}')
 
-        pass
 
 gui = System2()
