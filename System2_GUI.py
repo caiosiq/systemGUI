@@ -1303,12 +1303,19 @@ class System2:
         sys.exit(0)  # Force exit the Python process
 
     def test(self):
+        print('Test balance connection')
         p = f'COM{5}'
         ser = serial.Serial(port=p, baudrate=9600, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
                             bytesize=serial.EIGHTBITS, timeout=0.2)
         print("connected to: " + ser.portstr)
         from time import sleep
-        sleep(2)
+        for i in range(5):
+            balance_data = ser.read(1000)
+            value = balance_data.split()[1].decode('ascii').strip()
+            value = float(value.split('g')[0])
+            print('Read value:', value)
+            sleep(.5)
+
         ser.close()
         print(f'Closed {ser.portstr}')
 
