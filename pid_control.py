@@ -309,10 +309,9 @@ class PIDControl:
                             elif self.pump_type == 'REGLO':
                                 # Extract channel from pump name (assuming format "Pump X")
                                 try:
-                                    channel = int(self.pump_name.split()[-1])
+                                    channel = int(list(self.pump_name)[-1])
                                     pump_ser.set_speed(channel, output)
                                 except (ValueError, IndexError):
-                                    print(f"Could not extract channel number from {self.pump_name}")
                                     pump_ser.set_speed(1, output)  # Default to channel 1
                         
                         last_flow_rate = flow_rate
