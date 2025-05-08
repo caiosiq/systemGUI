@@ -171,7 +171,6 @@ class OneBitClass(PLC):
 class WriteFloatsPLC(PLC):
     def write_float(self, reg1, value): # reg2 is automatically reg1 + 1 in the code
         try:
-            print('this is the value', value)
             builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.LITTLE)
             builder.add_32bit_float(value)
             payload = builder.to_registers()  # Converts to register values instead of raw bytes
