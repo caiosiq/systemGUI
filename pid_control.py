@@ -326,8 +326,8 @@ class PIDControl:
                             self.excel_obj.change_data(self.pump_name, self.get_last())
                         
                         # Update graph
-                        self.graph_obj.update_dict("balance", self.pump_name, self.mass)
-                        self.graph_obj.update_dict("flow_rate", self.pump_name, self.flow_rate)
+                        self.graph_obj.update_dict("balances", self.pump_name, self.mass)
+                        self.graph_obj.update_dict("flow_rates", self.pump_name, self.flow_rate)
                         
                     except (ValueError, IndexError) as e:
                         print(f"Error parsing balance data: {e}")
@@ -339,8 +339,8 @@ class PIDControl:
                     time.sleep(1)  # Prevent tight error loop
             
             # Clear data when stopped
-            self.graph_obj.update_dict("balance", self.pump_name, None)
-            self.graph_obj.update_dict("flow_rate", self.pump_name, None)
+            self.graph_obj.update_dict("balances", self.pump_name, None)
+            self.graph_obj.update_dict("flow_rates", self.pump_name, None)
             
             if self.excel_obj:
                 self.excel_obj.change_data(self.pump_name, self.get_last())
