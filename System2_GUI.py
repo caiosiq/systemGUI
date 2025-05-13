@@ -240,14 +240,14 @@ class System2:
         # Add entries for each pump channel
         for pump_name in self.pumps_list:
             for channel in range(1, 5):  # 4 channels per pump
-                channel_name = f"{pump_name} Ch{channel}"
+                channel_name = f"{pump_name}_Ch{channel}"
                 self.balances_dict[channel_name] = [True, True, []]
         
         # Flow rate data - per channel
         self.flow_rates_dict = {}
         for pump_name in self.pumps_list:
             for channel in range(1, 5):  # 4 channels per pump
-                channel_name = f"{pump_name} Ch{channel}"
+                channel_name = f"{pump_name}_Ch{channel}"
                 self.flow_rates_dict[channel_name] = [True, True, []]
         
         # Create the graph object
@@ -825,6 +825,9 @@ class System2:
     def start_pid_control(self, channel_id):
         """Start PID control for a specific pump channel."""
         # Parse pump name and channel from channel_id
+        self.graph.toggle_series("balances", channel_id, True)
+        self.graph.toggle_series("flow_rates", channel_id, True)
+
         parts = channel_id.split('_Ch')
         pump_name = parts[0]
         channel = int(parts[1])

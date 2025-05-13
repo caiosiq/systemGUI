@@ -332,7 +332,7 @@ class PIDControl:
                     except (ValueError, IndexError) as e:
                         print(f"Error parsing balance data: {e}")
                     
-                    time.sleep(0.1)
+                    time.sleep(0.5)
                     
                 except Exception as e:
                     print(f'Error in PID loop: {e}')
