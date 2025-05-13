@@ -109,6 +109,8 @@ class System2:
         self.pump_controls = {}  # Dictionary to store UI elements
         self.pump_plot_on = False
         self.create_pump_ui()
+        self.pump_polling_threads = {}
+        self.stop_polling_flags = {}
 
         # Add PID control UI
         self.create_pid_control_ui()
@@ -503,6 +505,28 @@ class System2:
             self.graph.clear_data()
 
     # pumps
+    def start_flow_polling(self, channel_name, pump_ser, channel):
+        if channel_name in self.pump_polling_threads:
+            return
+
+        stop_flag = threading.Event()
+        self.stop_polling_flags[channel_name] = stop_flag
+
+        def poll():
+            while not stop_flag.is_set():
+                try:
+                    value = pump_ser.get_speed(channel)
+                    self.graph.update_dict("flow_rates", channel_name, value)
+                    time.sleep(0.5)
+                except Exception as e:
+                    print(f"Polling error on {channel_name}: {e}")
+                    break
+
+        t = threading.Thread(target=poll)
+        t.daemon = True
+        self.pump_polling_threads[channel_name] = t
+        t.start()
+
     def create_pump_ui(self):
         """Creates UI elements for pumps with the updated PumpControl class structure."""
         frame = tk.Frame(self.equipment_frame)
@@ -650,29 +674,28 @@ class System2:
             except Exception as e:
                 print(f"Error disconnecting pump: {e}")
 
+
     def pump_on(self, pump_index, channel):
-        """Turns on the specified pump channel if connected."""
         if not self.pump_connect_vars[pump_index]:
-            return  # Ignore if pump is not connected
+            return
 
         try:
-            # Get the PumpControl object
             pump_control = self.pump_objects[pump_index]
-
-            # Find the channel controls
-            channel_id = f"{pump_index}_{channel - 1}"  # Convert 1-based channel to 0-based index
+            channel_id = f"{pump_index}_{channel - 1}"
             channel_controls = pump_control.channel_dict.get(channel_id)
 
             if not channel_controls:
                 print(f"Channel controls not found for channel {channel}")
                 return
 
-            # Turn on the channel
             pump_control.serial_obj.start_channel(channel)
 
-            # Update the UI
             channel_controls["on_btn"].config(bg="pale green")
             channel_controls["off_btn"].config(bg="SystemButtonFace")
+
+            # Start flow polling
+            channel_name = f"{self.pumps_list[pump_index]}_Ch{channel}"
+            self.start_flow_polling(channel_name, pump_control.serial_obj, channel)
 
         except Exception as e:
             print(f"Error turning on pump channel: {e}")
@@ -706,27 +729,18 @@ class System2:
         except Exception as e:
             print(f"Error turning off pump channel: {e}")
 
+
     def pump_set_flow_rate(self, pump_index, channel, flow_var):
-        """Sets the flow rate for the specified pump channel."""
         if not self.pump_connect_vars[pump_index]:
-            return  # Ignore if not connected
+            return
 
         try:
-            # Get the PumpControl object
             pump_control = self.pump_objects[pump_index]
-
-            # Get flow rate from entry
             flow_rate = float(flow_var.get())
-
-            # Set flow rate
             pump_control.serial_obj.set_speed(channel, flow_rate)
 
-            # Update the graph with the new flow rate
-            channel_name = f"{self.pumps_list[pump_index]} Ch{channel}"
-            self.pump_plot_on = True
-            t = threading.Thread(target=self.update_flow_rate_graph, args=(channel_name, flow_rate))
-            t.daemon = True
-            t.start()
+            channel_name = f"{self.pumps_list[pump_index]}_Ch{channel}"
+            self.start_flow_polling(channel_name, pump_control.serial_obj, channel)
 
         except ValueError:
             tk.messagebox.showerror("Error", "Please enter a valid flow rate")
@@ -832,49 +846,42 @@ class System2:
             # Stop existing PID controller
             self.stop_pid_control(channel_id)
 
+
     def start_pid_control(self, channel_id):
-        """Start PID control for a specific pump channel."""
-        # Parse pump name and channel from channel_id
         self.graph.toggle_series("balances", channel_id, True)
         self.graph.toggle_series("flow_rates", channel_id, True)
 
         parts = channel_id.split('_Ch')
         pump_name = parts[0]
         channel = int(parts[1])
-
-        # Get pump index
         pump_index = self.pumps_list.index(pump_name)
 
-        # Verify the pump is connected
         if not self.pump_connect_vars[pump_index]:
             tk.messagebox.showerror("Error", f"{pump_name} is not connected. Please connect the pump first.")
             return
 
-        # Get the balance port
+        # Stop polling
+        if channel_id in self.stop_polling_flags:
+            self.stop_polling_flags[channel_id].set()
+            del self.stop_polling_flags[channel_id]
+            del self.pump_polling_threads[channel_id]
+
         balance_port = self.pid_port_vars[pump_name].get()
         if not balance_port:
             tk.messagebox.showerror("Error", "Please enter a balance port number.")
             return
 
         try:
-            # Connect to balance
             balance_ser = serial.Serial(
-                f'COM{balance_port}',
-                9600,
-                timeout=1,
+                f'COM{balance_port}', 9600, timeout=1,
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
                 bytesize=serial.EIGHTBITS,
             )
-
-            # Get the PumpControl object and its serial object
             pump_control = self.pump_objects[pump_index]
             pump_ser = pump_control.serial_obj
-
-            # Get pump type - for this implementation we're using REGLO pumps
             pump_type = "REGLO"
 
-            # Create PID controller configuration
             pid_config = {
                 'set_point': self.pid_setpoint_vars[channel_id].get(),
                 'kp': self.pid_kp_vars[channel_id].get(),
@@ -883,36 +890,16 @@ class System2:
                 'integral_error_limit': self.pid_integral_limit_var.get()
             }
 
-            # Create PID controller with channel-specific name
             pid_controller = PIDControl(
-                balance_ser,
-                pump_ser,
-                pump_type,
-                channel_id,  # Use channel_id as the name for the controller
-                self.graph
+                balance_ser, pump_ser, pump_type, channel_id, self.graph
             )
+            pid_controller.set_controller_and_matrix(pid_config, self.pid_data_points_var.get())
 
-            # Set controller parameters
-            pid_controller.set_controller_and_matrix(
-                pid_config,
-                self.pid_data_points_var.get()
-            )
-
-            # Start the PID control thread
-            success = pid_controller.start()
-
-            if success:
-                # Store the controller
+            if pid_controller.start():
                 self.pid_controllers[channel_id] = pid_controller
-
-                # Update status
                 self.pid_status_vars[channel_id].set("Active")
-
-                # Update the button
-                if hasattr(self, 'pid_buttons') and channel_id in self.pid_buttons:
+                if channel_id in self.pid_buttons:
                     self.pid_buttons[channel_id].config(text="Stop PID", bg="IndianRed1")
-
-                tk.messagebox.showinfo("PID Control", f"PID control started for {channel_id}")
             else:
                 tk.messagebox.showerror("Error", f"Failed to start PID control for {channel_id}")
                 balance_ser.close()
@@ -920,32 +907,30 @@ class System2:
         except Exception as e:
             tk.messagebox.showerror("Error", f"Error starting PID control: {str(e)}")
 
-    def stop_pid_control(self, channel_id):
-        """Stop PID control for a specific pump channel."""
-        if channel_id in self.pid_controllers:
-            # Get the controller
-            pid_controller = self.pid_controllers[channel_id]
 
-            # Stop the controller
+    def stop_pid_control(self, channel_id):
+        if channel_id in self.pid_controllers:
+            pid_controller = self.pid_controllers[channel_id]
             pid_controller.set_stop(True)
 
-            # Close the balance serial port
             try:
                 pid_controller.balance_ser.close()
             except:
                 pass
 
-            # Update status
             self.pid_status_vars[channel_id].set("Inactive")
-
-            # Update the button - now use the dictionary
-            if hasattr(self, 'pid_buttons') and channel_id in self.pid_buttons:
+            if channel_id in self.pid_buttons:
                 self.pid_buttons[channel_id].config(text="Start PID", bg="SystemButtonFace")
 
-            # Remove the controller
             del self.pid_controllers[channel_id]
 
-            tk.messagebox.showinfo("PID Control", f"PID control stopped for {channel_id}")
+            # Resume polling
+            parts = channel_id.split('_Ch')
+            pump_name = parts[0]
+            channel = int(parts[1])
+            pump_index = self.pumps_list.index(pump_name)
+            pump_ser = self.pump_objects[pump_index].serial_obj
+            self.start_flow_polling(channel_id, pump_ser, channel)
 
     def show_pid_help(self):
         """Show help information about PID control."""

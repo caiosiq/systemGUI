@@ -4,6 +4,7 @@ from time import sleep
 import struct
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadBuilder
+import threading
 
 # https://blog.darwin-microfluidics.com/how-to-control-the-reglo-icc-pump-using-python-and-matlab/
 class Pump:
@@ -11,6 +12,7 @@ class Pump:
     Reglo ICC Pump Control Library
     """
     def __init__(self, port_number):
+        self.lock = threading.Lock()  # Add this
         self.COM = f'COM{port_number}'
         self.sp = serial.Serial(
             self.COM,
@@ -60,33 +62,33 @@ class Pump:
         return self.sp.read(self.sp.in_waiting).decode()
 
     def set_speed(self, channel: int, speed: float) -> str:
-        command = f"{channel}M\r".encode()  # set flow rate mode
-        self.sp.write(command)
-
-        # Convert speed to scientific notation format (e.g., 4.5 → "0450E-3")
-        speed_int = int(speed * 1000)  # Convert to integer in nL/min
-        speed_string = f"{speed_int:04d}-3"  # Format as "XXXX-3"
-
-        command = f"{channel}f{speed_string}\r" # set speed command
-        self.sp.write(command.encode())
-        sleep(0.1)
-        print(self.sp.read(self.sp.in_waiting).decode())
+        with self.lock:
+            self.sp.write(f"{channel}M\r".encode())
+            speed_int = int(speed * 1000)
+            speed_string = f"{speed_int:04d}-3"
+            command = f"{channel}f{speed_string}\r"
+            self.sp.write(command.encode())
+            sleep(0.1)
+            return self.sp.read(self.sp.in_waiting).decode(errors='ignore')
 
     def get_speed(self, channel):
-        command = f"{channel}f\r".encode()
-        self.sp.write(command)
-        sleep(0.1)
-        response = self.sp.read(self.sp.in_waiting).decode().strip()
+        with self.lock:
+            self.sp.reset_input_buffer()
+            self.sp.write(f"{channel}f\r".encode())
+            sleep(0.1)
+            raw_response = self.sp.read(self.sp.in_waiting).decode(errors='ignore').strip()
+            lines = [line.strip() for line in raw_response.splitlines() if line.strip()]
 
-        # Parse the response to get the flow rate value
-        value = float(response)
+            for line in reversed(lines):
+                try:
+                    value = float(line)
+                    if value > 100:
+                        value = value / 1000.0
+                    return round(value, 2)
+                except ValueError:
+                    continue
 
-        # Convert from μL/min to mL/min if needed (for values like 30003.0)
-        if value > 100:  # Assume values over 100 are in μL/min
-            value = value / 1000.0
-
-        # Round to 2 decimal places
-        return round(value, 2)
+            raise ValueError("No response from pump")
 
     def set_mode(self, channel, mode):
         if mode == 0:
