@@ -204,14 +204,14 @@ class Graph:
             name: Name of the data series
             value: New data value
         """
-        print('Updating dict:', dict_type, name, value)
-        d = self.get_dict_type(dict_type)
-        if d and name in d and d[name][0] and d[name][1]:
-            # If we've reached max points, use a deque-like behavior
-            if len(d[name][2]) >= self.max_points:
-                d[name][2] = d[name][2][-(self.max_points-1):] + [(time.time(), value)]
-            else:
-                d[name][2].append((time.time(), value))
+        if value != None:
+            d = self.get_dict_type(dict_type)
+            if d and name in d and d[name][0] and d[name][1]:
+                # If we've reached max points, use a deque-like behavior
+                if len(d[name][2]) >= self.max_points:
+                    d[name][2] = d[name][2][-(self.max_points-1):] + [(time.time(), value)]
+                else:
+                    d[name][2].append((time.time(), value))
 
     def toggle_series(self, dict_type, name, is_visible=None):
         """

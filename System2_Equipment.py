@@ -73,10 +73,20 @@ class Pump:
         print(self.sp.read(self.sp.in_waiting).decode())
 
     def get_speed(self, channel):
-        command = f"{channel}S\r".encode()
+        command = f"{channel}f\r".encode()
         self.sp.write(command)
         sleep(0.1)
-        return self.sp.read(self.sp.in_waiting).decode()
+        response = self.sp.read(self.sp.in_waiting).decode().strip()
+
+        # Parse the response to get the flow rate value
+        value = float(response)
+
+        # Convert from μL/min to mL/min if needed (for values like 30003.0)
+        if value > 100:  # Assume values over 100 are in μL/min
+            value = value / 1000.0
+
+        # Round to 2 decimal places
+        return round(value, 2)
 
     def set_mode(self, channel, mode):
         if mode == 0:
