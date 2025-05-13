@@ -369,7 +369,8 @@ class System2:
                 tk.Label(pump_frame, text=f"{name}:", width=8, anchor="w").pack(side="left", padx=(0, 5))
 
                 for channel in range(1, 5):  # 4 channels
-                    channel_name = f"{name} Ch{channel}"
+                    # Fix: Use consistent naming format with underscores
+                    channel_name = f"{name}_Ch{channel}"
                     expanded_series_list.append(channel_name)
 
                     # Get the dictionary for this data type
