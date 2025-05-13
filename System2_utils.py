@@ -1,14 +1,12 @@
 import time
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter, MinuteLocator
 import datetime
-import numpy as np
-from collections import deque
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 import datetime
 import os
+import threading
 
 class Graph:
     def __init__(self, temperatures_dict, pressures_dict, balances_dict, flow_rates_dict, 
@@ -278,7 +276,7 @@ class Graph:
 
     def export_data(self, filename=None):
         """
-        Export all current data to a nicely formatted Excel file without summary page.
+        Export all current data to a nicely formatted Excel file without timestamp column.
         Only includes data sheets for each measurement type.
         
         Args:
@@ -288,7 +286,7 @@ class Graph:
             The filename of the exported file
         """
         if filename is None:
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"system2_data_{timestamp}.xlsx"
         
         # Create a new workbook and select the active worksheet
@@ -303,7 +301,7 @@ class Graph:
         # First, collect all timestamps for each data type
         for data_type in data_types:
             dict_name = f"{data_type.lower()}_dict"
-            data_dict = getattr(self, dict_name)  # Access data directly from self
+            data_dict = getattr(self, dict_name)
             
             # Collect all timestamps for this data type
             timestamps = set()
@@ -340,21 +338,16 @@ class Graph:
                 bottom=Side(style='thin')
             )
             
-            # First row: Headers
-            # Add timestamp column header
-            ws.cell(row=1, column=1).value = "Timestamp"
-            ws.cell(row=1, column=2).value = "Date/Time"
+            # First row: Headers - now we'll only have Date/Time column and data columns
+            # Add date/time column header
+            ws.cell(row=1, column=1).value = "Date/Time"
             ws.cell(row=1, column=1).font = header_font
-            ws.cell(row=1, column=2).font = header_font
             ws.cell(row=1, column=1).fill = header_fill
-            ws.cell(row=1, column=2).fill = header_fill
             ws.cell(row=1, column=1).alignment = header_alignment
-            ws.cell(row=1, column=2).alignment = header_alignment
             ws.cell(row=1, column=1).border = thin_border
-            ws.cell(row=1, column=2).border = thin_border
             
             # Add data series headers
-            col_idx = 3
+            col_idx = 2
             series_indices = {}  # To track column indices for each series
             
             for name in data_dict:
@@ -371,13 +364,11 @@ class Graph:
             for row_idx, ts in enumerate(timestamps, start=2):
                 # Convert timestamp to readable datetime
                 dt = datetime.datetime.fromtimestamp(ts)
-                formatted_dt = dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                formatted_dt = dt.strftime("%Y-%m-%d %H:%M:%S")
                 
-                # Add timestamp
-                ws.cell(row=row_idx, column=1).value = ts
-                ws.cell(row=row_idx, column=2).value = formatted_dt
+                # Add datetime - no raw timestamp anymore
+                ws.cell(row=row_idx, column=1).value = formatted_dt
                 ws.cell(row=row_idx, column=1).border = thin_border
-                ws.cell(row=row_idx, column=2).border = thin_border
                 
                 # Add values for each series
                 for name, col_idx in series_indices.items():
@@ -395,7 +386,7 @@ class Graph:
                     ws.cell(row=row_idx, column=col_idx).border = thin_border
             
             # Auto-adjust column widths
-            for col_idx in range(1, len(series_indices) + 3):
+            for col_idx in range(1, len(series_indices) + 2):
                 ws.column_dimensions[get_column_letter(col_idx)].width = 15
             
             # Freeze the header row
@@ -453,3 +444,102 @@ class Graph:
             stop: True to stop plotting, False to resume
         """
         self.gui_plot_stopped = stop
+
+class DataCollector:
+    """
+    A class to synchronize data collection and ensure all sensors are read together
+    before recording data points. This addresses the issue of partially empty rows.
+    """
+    def __init__(self, graph):
+        """
+        Initialize the DataCollector with reference to the graph object.
+        
+        Args:
+            graph: The Graph object where data is stored
+        """
+        self.graph = graph
+        self.collection_interval = 1.0  # 1 second interval
+        self.running = False
+        self.thread = None
+        
+        # Buffers to store most recent sensor values
+        self.temperature_buffer = {}
+        self.pressure_buffer = {}
+        self.flow_rate_buffer = {}
+        self.balance_buffer = {}
+        
+        # Lock to protect buffers during updates
+        self.buffer_lock = threading.Lock()
+    
+    def buffer_update(self, data_type, name, value):
+        """
+        Updates the appropriate buffer with the latest sensor reading.
+        This method should be called by the sensor reading callbacks.
+        
+        Args:
+            data_type: Type of data (temperatures, pressures, etc.)
+            name: Name of the sensor
+            value: Current sensor reading
+        """
+        with self.buffer_lock:
+            if data_type == "temperatures":
+                self.temperature_buffer[name] = value
+            elif data_type == "pressures":
+                self.pressure_buffer[name] = value
+            elif data_type == "flow_rates":
+                self.flow_rate_buffer[name] = value
+            elif data_type == "balances":
+                self.balance_buffer[name] = value
+    
+    def start_collection(self):
+        """Start the synchronized data collection thread."""
+        if not self.running:
+            self.running = True
+            self.thread = threading.Thread(target=self._collection_loop)
+            self.thread.daemon = True
+            self.thread.start()
+            return True
+        return False
+    
+    def stop_collection(self):
+        """Stop the data collection thread."""
+        self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=2.0)
+    
+    def _collection_loop(self):
+        """
+        Main collection loop that runs at a fixed interval.
+        This ensures all data points are collected at the same timestamp.
+        """
+        while self.running:
+            # Get the current timestamp
+            timestamp = time.time()
+            
+            # Capture current buffer state to avoid race conditions
+            with self.buffer_lock:
+                temp_data = self.temperature_buffer.copy()
+                press_data = self.pressure_buffer.copy()
+                flow_data = self.flow_rate_buffer.copy()
+                bal_data = self.balance_buffer.copy()
+            
+            # Update the graph with synchronized data
+            for name, value in temp_data.items():
+                if self.graph.temperatures_dict.get(name) and self.graph.temperatures_dict[name][0] and self.graph.temperatures_dict[name][1]:
+                    # Replace the automatic timestamp with our synchronized one
+                    self.graph.temperatures_dict[name][2].append((timestamp, value))
+            
+            for name, value in press_data.items():
+                if self.graph.pressures_dict.get(name) and self.graph.pressures_dict[name][0] and self.graph.pressures_dict[name][1]:
+                    self.graph.pressures_dict[name][2].append((timestamp, value))
+            
+            for name, value in flow_data.items():
+                if self.graph.flow_rates_dict.get(name) and self.graph.flow_rates_dict[name][0] and self.graph.flow_rates_dict[name][1]:
+                    self.graph.flow_rates_dict[name][2].append((timestamp, value))
+            
+            for name, value in bal_data.items():
+                if self.graph.balances_dict.get(name) and self.graph.balances_dict[name][0] and self.graph.balances_dict[name][1]:
+                    self.graph.balances_dict[name][2].append((timestamp, value))
+            
+            # Sleep for the collection interval
+            time.sleep(self.collection_interval)

@@ -3,7 +3,7 @@ import threading
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC
-from System2_utils import Graph
+from System2_utils import Graph, DataCollector
 from pid_control import PIDControl
 import serial
 import time
@@ -219,6 +219,10 @@ class System2:
         
         # Start the graph
         self.start_graph()
+
+        # Setup synchronized data collection
+        self.setup_synchronized_data_collection()
+
 
     def init_graph_data(self):
         """Initialize dictionaries for the graph data with channel-specific entries"""
@@ -1241,33 +1245,39 @@ class System2:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar_y.pack(side="right", fill="y")
 
+    def setup_synchronized_data_collection(self):
+        """Create and start the synchronized data collector"""
+        self.data_collector = DataCollector(self.graph)
+        self.data_collector.start_collection()
+
     def read_float_values(self, plc_object, data_type):
         """
-        For PLC equipment that reads float values
+        For PLC equipment that reads float values with synchronized data collection
         data_type is the type of equipment (i.e. Temperatures or Pressure Transmitters)
         """
         for equipment_name in self.equipment_data[data_type]:
             label = self.equipment_data[data_type][equipment_name]
             reg1 = self.register_dictionary[data_type][equipment_name].get()
 
-            # Create a custom function to update both the label and the graph
-            def update_value_and_graph(label, equipment_name, data_type):
+            # Create a custom function to update the buffer and the label
+            def update_value_and_buffer(label, equipment_name, data_type):
                 def _update(value):
                     # Update the label
                     label.config(text=str(value))
-                    # Update the graph data
+                    
+                    # Update the data collector buffer instead of directly updating the graph
                     data_type_lower = data_type.lower()
                     if data_type_lower == "pressure transmitters":
-                        data_type_lower = "pressures"  # dictionary name is pressures_dicts
-                    self.graph.update_dict(data_type_lower, equipment_name, value)
+                        data_type_lower = "pressures"  # dictionary name is pressures_dict
+                    self.data_collector.buffer_update(data_type_lower, equipment_name, value)
                 return _update
 
-            callback = update_value_and_graph(label, equipment_name, data_type)
-            
-            # Modified to pass our custom callback function that updates both UI and graph
-            t = threading.Thread(target=lambda: plc_object.read_float(callback, reg1, reg1+1))
-            t.daemon = True
-            t.start()
+        callback = update_value_and_buffer(label, equipment_name, data_type)
+        
+        # Start the reading thread
+        t = threading.Thread(target=lambda: plc_object.read_float(callback, reg1, reg1+1))
+        t.daemon = True
+        t.start()
  
     def write_float_values(self, equipment_type, equipment_name, value):
         """
@@ -1303,7 +1313,10 @@ class System2:
             self.root.quit()
     
     def on_closing(self):
-        """Handle window close event (X button)"""
+        """Handle window close event with data collector cleanup."""
+        if hasattr(self, 'data_collector'):
+            self.data_collector.stop_collection()
+        
         if hasattr(self, 'graph'):
             self.graph.stop_plotting(True)  # Stop the plot thread
         
