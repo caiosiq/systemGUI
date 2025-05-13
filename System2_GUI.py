@@ -729,7 +729,6 @@ class System2:
         except Exception as e:
             print(f"Error turning off pump channel: {e}")
 
-
     def pump_set_flow_rate(self, pump_index, channel, flow_var):
         if not self.pump_connect_vars[pump_index]:
             return
@@ -740,7 +739,16 @@ class System2:
             pump_control.serial_obj.set_speed(channel, flow_rate)
 
             channel_name = f"{self.pumps_list[pump_index]}_Ch{channel}"
+
+            # Start polling pump output
             self.start_flow_polling(channel_name, pump_control.serial_obj, channel)
+
+            if channel_name in self.pid_setpoint_vars:
+                self.pid_setpoint_vars[channel_name].set(flow_rate)
+
+            if channel_name in self.pid_controllers:
+                pid = self.pid_controllers[channel_name]
+                pid.pump_controller._set_point = flow_rate
 
         except ValueError:
             tk.messagebox.showerror("Error", "Please enter a valid flow rate")
@@ -840,6 +848,7 @@ class System2:
     def toggle_pid_control(self, channel_id):
         """Start or stop PID control for a specific pump channel."""
         if channel_id not in self.pid_controllers:
+            print(channel_id, 'his is chid')
             # Start new PID controller
             self.start_pid_control(channel_id)
         else:
