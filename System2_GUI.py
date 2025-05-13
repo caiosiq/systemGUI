@@ -6,6 +6,7 @@ from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC
 from System2_utils import Graph
 from pid_control import PIDControl
 import serial
+import time
 
 
 class PumpControl:
@@ -104,6 +105,7 @@ class System2:
         self.pump_port_vars = [None] * len(self.pumps_list)
         self.pump_objects = {}
         self.pump_controls = {}  # Dictionary to store UI elements
+        self.pump_plot_on = False
         self.create_pump_ui()
 
         # Add PID control UI
@@ -690,6 +692,8 @@ class System2:
             channel_controls["off_btn"].config(bg="IndianRed1")
             channel_controls["on_btn"].config(bg="SystemButtonFace")
 
+            self.pump_plot_on = False
+
         except Exception as e:
             print(f"Error turning off pump channel: {e}")
 
@@ -710,12 +714,21 @@ class System2:
 
             # Update the graph with the new flow rate
             channel_name = f"{self.pumps_list[pump_index]} Ch{channel}"
-            self.graph.update_dict("flow_rates", channel_name, flow_rate)
+            self.pump_plot_on = True
+            t = threading.Thread(target=self.update_flow_rate_graph, args=(channel_name, flow_rate))
+            t.daemon = True
+            t.start()
 
         except ValueError:
             tk.messagebox.showerror("Error", "Please enter a valid flow rate")
         except Exception as e:
             print(f"Error setting flow rate: {e}")
+    
+    def update_flow_rate_graph(self, channel_name, flow_rate):
+        while self.pump_plot_on:
+            # Update the flow rate in the graph
+            self.graph.update_dict("flow_rates", channel_name, flow_rate)
+            time.sleep(0.5)
     
     def create_pid_control_ui(self):
         """Create the PID control UI elements with support for multiple channels per pump."""

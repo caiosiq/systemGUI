@@ -206,6 +206,7 @@ class Graph:
             name: Name of the data series
             value: New data value
         """
+        print('Updating dict:', dict_type, name, value)
         d = self.get_dict_type(dict_type)
         if d and name in d and d[name][0] and d[name][1]:
             # If we've reached max points, use a deque-like behavior
