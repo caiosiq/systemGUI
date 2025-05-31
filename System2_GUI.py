@@ -7,7 +7,7 @@ from System2_utils import Graph, DataCollector
 from pid_control import PIDControl
 import serial
 import time
-
+import sys
 
 class PumpControl:
     """Encapsulates all UI elements for a pump."""
@@ -1337,14 +1337,11 @@ class System2:
 
         if hasattr(self, 'testing') and self.testing:
             self.testing = False  # Stop the test data thread if running
-
-        # Wait briefly for threads to terminate
-        import time
+        
         time.sleep(0.2)
 
-        self.root.destroy()  # Destroy the Tkinter root window
-        import sys
-        sys.exit(0)  # Force exit the Python process
+        self.root.destroy()
+        sys.exit(0)
 
     def test(self):
         print('Test balance connection')
