@@ -24,10 +24,11 @@ class PumpControl:
         self.serial_obj = serial_obj
 
 
-# holds all pump and plc addresses
 addresses = {
     'Pumps': [9],
-    'Balances': [5],
+    'Balances': {
+        'Pump 1': [5, 6, 7, 8]
+    },
     'Temperatures': [28710, 28712, 28714],
     'Pressure Transmitters': [28750, 28752, 28754],
     'Pressure Regulators': [28770, 28772],
@@ -37,17 +38,16 @@ addresses = {
     'Drums': [16387]
 }
 
-
 class System2:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("System Two Control Panel")
-        self.root.state('zoomed')  # Maximize window for better visibility
+        self.root.state('zoomed')  # Maximize window
 
         main_frame = tk.Frame(self.root)
         main_frame.pack(fill="both", expand=True)
 
-        # Split the interface into equipment control and graph areas
+        # Split the interface into equipment control and graph
         left_panel = tk.Frame(main_frame)
         left_panel.pack(side="left", fill="y", padx=10, pady=10)
 
@@ -106,22 +106,13 @@ class System2:
         self.pump_connect_vars = [False] * len(self.pumps_list)
         self.pump_port_vars = [None] * len(self.pumps_list)
         self.pump_objects = {}
-        self.pump_controls = {}  # Dictionary to store UI elements
+        self.pump_controls = {} 
         self.pump_plot_on = False
         self.create_pump_ui()
+        self.create_pid_control_ui()
         self.pump_polling_threads = {}
         self.stop_polling_flags = {}
-
-        # Add PID control UI
-        self.create_pid_control_ui()
-
-        # Initialize PID controllers dict
         self.pid_controllers = {}
-
-        # Save the original on_closing method
-        self.original_on_closing = self.on_closing
-        # Replace with our version that cleans up PID controllers
-        self.on_closing = self.on_closing_with_pid
 
         # Maps equipment type to a dictionary that maps a specific equipment to either the current_label
         # for temp and pressure transmitters, or the current value variable for pressure regulator and stirrer
@@ -767,13 +758,13 @@ class System2:
         pid_frame = tk.LabelFrame(self.equipment_frame, text="PID Control")
 
         # Header row (Pump + Channels)
-        headers = ["Pump", "Channel", "Status", "Set Point", "Kp", "Ki", "Kd", "Start/Stop"]
+        headers = ["Pump", "Channel", "Balance Port", "Status", "Set Point", "Kp", "Ki", "Kd", "Start/Stop"]
         for col, text in enumerate(headers):
             tk.Label(pid_frame, text=text, font=("Arial", 12, "bold")).grid(row=0, column=col, padx=5, pady=5)
 
         self.pid_controllers = {}
         self.pid_status_vars = {}
-        self.pid_port_vars = {}
+        self.pid_balance_port_vars = {}  # Changed from pid_port_vars
         self.pid_setpoint_vars = {}
         self.pid_kp_vars = {}
         self.pid_ki_vars = {}
@@ -783,7 +774,9 @@ class System2:
 
         row_index = 1
         for pump_name in self.pumps_list:
-            self.pid_port_vars[pump_name] = tk.StringVar(value="5")  # Default
+            # Initialize balance port vars for this pump
+            if pump_name not in self.pid_balance_port_vars:
+                self.pid_balance_port_vars[pump_name] = {}
 
             for j in range(4):
                 channel = j + 1
@@ -796,43 +789,51 @@ class System2:
 
                 tk.Label(pid_frame, text=str(channel)).grid(row=row_index, column=1, padx=5, pady=2)
 
+                # Balance port entry for this specific channel
+                default_port = addresses["Balances"][pump_name][channel-1] if pump_name in addresses["Balances"] else 5
+                if channel not in self.pid_balance_port_vars[pump_name]:
+                    self.pid_balance_port_vars[pump_name][channel] = tk.StringVar(value=str(default_port))
+                
+                balance_entry = tk.Entry(pid_frame, textvariable=self.pid_balance_port_vars[pump_name][channel], width=8)
+                balance_entry.grid(row=row_index, column=2, padx=5, pady=2)
+
                 status_var = tk.StringVar(value="Inactive")
                 status_label = tk.Label(pid_frame, textvariable=status_var, width=10, relief="sunken", bg="light gray")
-                status_label.grid(row=row_index, column=2, padx=5, pady=2)
+                status_label.grid(row=row_index, column=3, padx=5, pady=2)
                 self.pid_status_vars[channel_id] = status_var
 
                 setpoint_var = tk.DoubleVar(value=1.0)
-                tk.Entry(pid_frame, textvariable=setpoint_var, width=8).grid(row=row_index, column=3, padx=5, pady=2)
+                tk.Entry(pid_frame, textvariable=setpoint_var, width=8).grid(row=row_index, column=4, padx=5, pady=2)
                 self.pid_setpoint_vars[channel_id] = setpoint_var
 
                 kp_var = tk.DoubleVar(value=0.1)
-                tk.Entry(pid_frame, textvariable=kp_var, width=8).grid(row=row_index, column=4, padx=5, pady=2)
+                tk.Entry(pid_frame, textvariable=kp_var, width=8).grid(row=row_index, column=5, padx=5, pady=2)
                 self.pid_kp_vars[channel_id] = kp_var
 
                 ki_var = tk.DoubleVar(value=0.01)
-                tk.Entry(pid_frame, textvariable=ki_var, width=8).grid(row=row_index, column=5, padx=5, pady=2)
+                tk.Entry(pid_frame, textvariable=ki_var, width=8).grid(row=row_index, column=6, padx=5, pady=2)
                 self.pid_ki_vars[channel_id] = ki_var
 
                 kd_var = tk.DoubleVar(value=0.001)
-                tk.Entry(pid_frame, textvariable=kd_var, width=8).grid(row=row_index, column=6, padx=5, pady=2)
+                tk.Entry(pid_frame, textvariable=kd_var, width=8).grid(row=row_index, column=7, padx=5, pady=2)
                 self.pid_kd_vars[channel_id] = kd_var
 
                 start_stop_btn = tk.Button(pid_frame, text="Start PID", width=10,
-                                           command=lambda id=channel_id: self.toggle_pid_control(id))
-                start_stop_btn.grid(row=row_index, column=7, padx=5, pady=2)
+                                        command=lambda id=channel_id: self.toggle_pid_control(id))
+                start_stop_btn.grid(row=row_index, column=8, padx=5, pady=2)
                 self.pid_buttons[channel_id] = start_stop_btn
 
                 row_index += 1
 
             # Separator row
             if pump_name != self.pumps_list[-1]:
-                tk.Frame(pid_frame, height=2, bd=1, relief=tk.SUNKEN).grid(row=row_index, column=0, columnspan=8,
-                                                                           sticky="ew", pady=5)
+                tk.Frame(pid_frame, height=2, bd=1, relief=tk.SUNKEN).grid(row=row_index, column=0, columnspan=9,
+                                                                        sticky="ew", pady=5)
                 row_index += 1
 
         # Control settings at the bottom
         control_frame = tk.Frame(pid_frame)
-        control_frame.grid(row=row_index, column=0, columnspan=8, pady=10, sticky="w")
+        control_frame.grid(row=row_index, column=0, columnspan=9, pady=10, sticky="w")
 
         tk.Label(control_frame, text="Integral Error Limit:").grid(row=0, column=0, padx=5, pady=2)
         self.pid_integral_limit_var = tk.DoubleVar(value=100.0)
@@ -841,8 +842,6 @@ class System2:
         tk.Label(control_frame, text="Data Points:").grid(row=0, column=2, padx=5, pady=2)
         self.pid_data_points_var = tk.IntVar(value=10)
         tk.Entry(control_frame, textvariable=self.pid_data_points_var, width=5).grid(row=0, column=3, padx=5, pady=2)
-
-        tk.Button(control_frame, text="PID Help", command=self.show_pid_help).grid(row=0, column=4, padx=20, pady=2)
 
         pid_frame.pack(anchor="nw", padx=15, pady=15)
 
@@ -855,7 +854,6 @@ class System2:
         else:
             # Stop existing PID controller
             self.stop_pid_control(channel_id)
-
 
     def start_pid_control(self, channel_id):
         self.graph.toggle_series("balances", channel_id, True)
@@ -876,9 +874,10 @@ class System2:
             del self.stop_polling_flags[channel_id]
             del self.pump_polling_threads[channel_id]
 
-        balance_port = self.pid_port_vars[pump_name].get()
+        # Get balance port for this specific channel
+        balance_port = self.pid_balance_port_vars[pump_name][channel].get()
         if not balance_port:
-            tk.messagebox.showerror("Error", "Please enter a balance port number.")
+            tk.messagebox.showerror("Error", f"Please enter a balance port number for {channel_id}.")
             return
 
         try:
@@ -917,7 +916,6 @@ class System2:
         except Exception as e:
             tk.messagebox.showerror("Error", f"Error starting PID control: {str(e)}")
 
-
     def stop_pid_control(self, channel_id):
         if channel_id in self.pid_controllers:
             pid_controller = self.pid_controllers[channel_id]
@@ -941,62 +939,6 @@ class System2:
             pump_index = self.pumps_list.index(pump_name)
             pump_ser = self.pump_objects[pump_index].serial_obj
             self.start_flow_polling(channel_id, pump_ser, channel)
-
-    def show_pid_help(self):
-        """Show help information about PID control."""
-        help_text = """
-        PID Control Help:
-
-        The PID controller uses feedback to maintain a stable flow rate by continuously adjusting the pump speed.
-
-        Parameters:
-        - Set Point: The target flow rate you want to maintain (mL/min)
-        - Kp: Proportional gain - Responds to current error (try 0.1-1.0)
-        - Ki: Integral gain - Responds to accumulated error (try 0.01-0.1)
-        - Kd: Derivative gain - Responds to rate of change of error (try 0.001-0.01)
-        - Integral Error Limit: Prevents excessive integral windup
-        - Data Points: Number of balance readings used to calculate flow rate
-
-        Connection:
-        - Balance Port: Enter the COM port number for the balance (e.g., 3 for COM3)
-        - The pump must be connected before starting PID control
-
-        Tips:
-        - Start with low Kp, Ki, and Kd values and gradually increase
-        - If oscillating too much: decrease Kp
-        - If responding too slowly: increase Kp
-        - If not reaching set point: increase Ki
-        - If overshooting: increase Kd
-
-        For the Reglo ICC pumps, the PID controller will automatically set the 
-        flow rate based on the balance readings.
-        """
-
-        help_window = tk.Toplevel(self.root)
-        help_window.title("PID Control Help")
-        help_window.geometry("600x400")
-
-        text_widget = tk.Text(help_window, wrap="word", padx=10, pady=10)
-        text_widget.insert("1.0", help_text)
-        text_widget.config(state="disabled")
-        text_widget.pack(fill="both", expand=True)
-
-        ok_button = tk.Button(help_window, text="OK", command=help_window.destroy)
-        ok_button.pack(pady=10)
-
-    def on_closing_with_pid(self):
-        """Handle window close event with PID cleanup."""
-        # Stop all PID controllers
-        if hasattr(self, 'pid_controllers'):
-            for pump_name, controller in list(self.pid_controllers.items()):
-                try:
-                    controller.set_stop(True)
-                    controller.stop_thread()  # Complete thread termination
-                except:
-                    pass
-
-        # Call the original on_closing method
-        self.original_on_closing()
 
     # other
     def create_equipment_section(self, title, items, connect_command, display_current=False, entry=False,
@@ -1179,16 +1121,27 @@ class System2:
         # Column headers
         tk.Label(pump_balance_frame, text="Pump Name", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=0)
         tk.Label(pump_balance_frame, text="Pump Port", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=1)
-        tk.Label(pump_balance_frame, text="Balance Port", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=2)
+        tk.Label(pump_balance_frame, text="Ch1 Balance", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=2)
+        tk.Label(pump_balance_frame, text="Ch2 Balance", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=3)
+        tk.Label(pump_balance_frame, text="Ch3 Balance", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=4)
+        tk.Label(pump_balance_frame, text="Ch4 Balance", font=("TkDefaultFont", 9, "underline")).grid(row=0, column=5)
 
-        # Initialize balance port variables if not already created
-        if not hasattr(self, 'balance_port_vars'):
-            self.balance_port_vars = {}
+        # Initialize balance port variables for each pump channel
+        self.balance_port_vars = {}
+        for pump_name in self.pumps_list:
+            self.balance_port_vars[pump_name] = {}
+            for channel in range(1, 5):
+                # Get default port from addresses if available
+                default_port = 5  # Default fallback
+                if pump_name in addresses["Balances"]:
+                    default_port = addresses["Balances"][pump_name][channel-1]
+                
+                self.balance_port_vars[pump_name][channel] = tk.StringVar(value=str(default_port))
 
         # Row for each pump
-        for i, name in enumerate(self.pumps_list):
+        for i, pump_name in enumerate(self.pumps_list):
             # Pump name
-            tk.Label(pump_balance_frame, text=name).grid(row=i + 1, column=0, padx=5)
+            tk.Label(pump_balance_frame, text=pump_name).grid(row=i + 1, column=0, padx=5)
 
             # Pump port entry
             address = addresses["Pumps"][i]
@@ -1199,15 +1152,24 @@ class System2:
             pump_port_entry.grid(row=i + 1, column=1, padx=5)
             self.pump_port_vars[i] = self.pump_port_var
 
-            # Balance port entry
-            if name not in self.balance_port_vars:
-                self.balance_port_vars[name] = tk.StringVar(value=addresses["Balances"][i])
-            balance_port_entry = tk.Entry(pump_balance_frame, textvariable=self.balance_port_vars[name])
-            balance_port_entry.grid(row=i + 1, column=2, padx=5)
+            # Initialize balance port dictionary for this pump if not exists
+            if pump_name not in self.balance_port_vars:
+                self.balance_port_vars[pump_name] = {}
 
-            # Also initialize the PID port vars with the same value
-            if hasattr(self, 'pid_port_vars') and name in self.pid_port_vars:
-                self.pid_port_vars[name] = self.balance_port_vars[name]
+            # Balance port entries for each channel
+            for channel in range(1, 5):  # Channels 1-4
+                channel_name = f"{pump_name}_Ch{channel}"
+                
+                # Get default value from addresses
+                default_port = addresses["Balances"][pump_name][channel-1] if pump_name in addresses["Balances"] else 5
+                
+                if channel not in self.balance_port_vars[pump_name]:
+                    self.balance_port_vars[pump_name][channel] = tk.StringVar(value=str(default_port))
+                
+                balance_port_entry = tk.Entry(pump_balance_frame, 
+                                            textvariable=self.balance_port_vars[pump_name][channel],
+                                            width=8)
+                balance_port_entry.grid(row=i + 1, column=channel + 1, padx=5)
 
         pump_balance_frame.pack(pady=10)
 
@@ -1333,10 +1295,15 @@ class System2:
             self.data_collector.stop_collection()
 
         if hasattr(self, 'graph'):
-            self.graph.stop_plotting(True)  # Stop the plot thread
-
-        if hasattr(self, 'testing') and self.testing:
-            self.testing = False  # Stop the test data thread if running
+            self.graph.stop_plotting(True)
+        
+        if hasattr(self, 'pid_controllers'):
+            for pump_name, controller in list(self.pid_controllers.items()):
+                try:
+                    controller.set_stop(True)
+                    controller.stop_thread()
+                except:
+                    pass
         
         time.sleep(0.2)
 
