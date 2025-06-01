@@ -538,7 +538,7 @@ class System2:
 
             # Create a connect button for the whole pump
             connect_btn = tk.Button(
-                frame, text="Disconnected", width=12,
+                frame, text="Connect", width=12,
                 command=lambda i=i: self.pump_connect(i))
             connect_btn.grid(row=row_index, column=1, padx=10, rowspan=4)
 
@@ -589,23 +589,6 @@ class System2:
 
         frame.pack(anchor="nw", padx=15, pady=15)
 
-    def update_button_colors(self, pump_index, state, channel=None):
-        """Updates UI button colors for a given pump."""
-        pump = self.pump_controls[pump_index]
-
-        if state == "connected":
-            pump.connect_button.config(bg="LightSkyBlue1", text="Connected")
-        elif state == "disconnected":
-            pump.connect_button.config(bg="SystemButtonFace", text="Disconnected")
-        elif channel is not None:  # Channel-specific states
-            channel_controls = pump.channels[channel]
-            if state == "on":
-                channel_controls['on_button'].config(bg="pale green")
-                channel_controls['off_button'].config(bg="SystemButtonFace")
-            elif state == "off":
-                channel_controls['off_button'].config(bg="IndianRed1")
-                channel_controls['on_button'].config(bg="SystemButtonFace")
-
     def pump_connect(self, pump_index):
         """Handles connecting/disconnecting a pump."""
         if not self.pump_connect_vars[pump_index]:  # If not connected
@@ -628,16 +611,8 @@ class System2:
                 # Get the PumpControl object
                 pump_control = self.pump_objects[pump_index]
 
-                # Update the button
-                pump_control.connect_button.config(bg="LightSkyBlue1", text="Connected")
-
                 # Set the serial object
                 pump_control.set_serial_obj(pump_ser)
-
-                # Enable all channel controls for this pump
-                for channel_id, controls in pump_control.channel_dict.items():
-                    controls["on_btn"].config(state=tk.NORMAL)
-                    controls["off_btn"].config(state=tk.NORMAL)
 
             except Exception as e:
                 print(f"Error connecting pump: {e}")
@@ -650,14 +625,6 @@ class System2:
 
                 # Get the PumpControl object
                 pump_control = self.pump_objects[pump_index]
-
-                # Update the button
-                pump_control.connect_button.config(bg="SystemButtonFace", text="Disconnected")
-
-                # Disable all channel controls for this pump
-                for channel_id, controls in pump_control.channel_dict.items():
-                    controls["on_btn"].config(state=tk.DISABLED)
-                    controls["off_btn"].config(state=tk.DISABLED)
 
                 # Clean up serial connection
                 if hasattr(pump_control, 'serial_obj'):
@@ -681,9 +648,6 @@ class System2:
                 return
 
             pump_control.serial_obj.start_channel(channel)
-
-            channel_controls["on_btn"].config(bg="pale green")
-            channel_controls["off_btn"].config(bg="SystemButtonFace")
 
             # Start flow polling
             channel_name = f"{self.pumps_list[pump_index]}_Ch{channel}"
@@ -711,10 +675,6 @@ class System2:
 
             # Turn off the channel
             pump_control.serial_obj.stop_channel(channel)
-
-            # Update the UI
-            channel_controls["off_btn"].config(bg="IndianRed1")
-            channel_controls["on_btn"].config(bg="SystemButtonFace")
 
             self.pump_plot_on = False
 
@@ -1037,7 +997,6 @@ class System2:
         connect_var = self.connect_dictionary["vars"][device_name]
 
         if connect_var == 0:  # If not connected, connect
-            connect_button.config(bg="pale green", text="Connected")
             self.connect_dictionary["vars"][device_name] = 1
             plc.connect()
             if read_float:
@@ -1045,7 +1004,6 @@ class System2:
                 self.read_float_values(plc_object, data_type)
         else:  # If connected, disconnect
             self.connect_dictionary["vars"][device_name] = 0
-            connect_button.config(bg="SystemButtonFace", text="Connect")
             if read_float:
                 plc.reading_onoff(False)
             plc.disconnect()
