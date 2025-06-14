@@ -1,0 +1,13 @@
+name: systemgui_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - matplotlib>=3.5.0
+  - pyserial>=3.5
+  - numpy>=1.21.0
+  - pandas>=1.3.0
+  - pip:
+    - -r requirements.txt
