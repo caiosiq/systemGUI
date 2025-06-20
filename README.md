@@ -50,21 +50,41 @@ Implements the PID algorithm used for automatic pump regulation. The `PIDControl
 Empty file that simply allows the directory to be imported as a module if needed.
 
 ## Dependencies
-The project has no requirements file, but the modules import:
+Install the required dependencies using either conda or pip:
 
-- `tkinter`
-- `matplotlib`
-- `numpy`, `scipy`
-- `serial` (`pyserial`)
-- `pymodbus`
-- `openpyxl`
-
-Install them with pip:
-
+### Using Conda (Recommended)
+1. Create and activate the conda environment:
 ```bash
-pip install matplotlib numpy scipy pyserial pymodbus openpyxl
+conda env create -f environment.yml
+conda activate systemgui_env
 ```
-On Linux you may also need `python3-tk` for Tkinter.
+
+### Using pip
+Alternatively, install the requirements using pip:
+```bash
+pip install -r requirements.txt
+```
+
+## Hardware Requirements
+To run this system with real hardware, you will need:
+ 
+1. **Pump System**:
+   - Reglo ICC Pump connected via serial port (default COM9)
+   - Pump must be configured for 9600 baud rate, no parity, 1 stop bit, 8 data bits
+
+2. **PLC System**:
+   - Programmable Logic Controller (PLC) on the network
+   - PLC must be accessible at IP address 169.254.83.200 on port 502
+
+3. **Industrial Equipment**:
+   - Connected balances for mass measurement
+   - Temperature sensors
+   - Pressure transmitters and regulators
+   - Control valves
+   - Stirrers
+   - Drum sensors
+
+All hardware must be properly powered and connected according to the addresses defined in the `addresses` dictionary at the top of `System2_GUI.py`.
 
 ## Running the GUI
 After installing the dependencies, launch the interface with:
