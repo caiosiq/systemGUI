@@ -1189,10 +1189,11 @@ class System2:
         For PLC equipment that reads float values with synchronized data collection
         data_type is the type of equipment (i.e. Temperatures or Pressure Transmitters)
         """
+        print(f"[read_float_values] Starting for type: {data_type}")
         for equipment_name in self.equipment_data[data_type]:
             label = self.equipment_data[data_type][equipment_name]
             reg1 = self.register_dictionary[data_type][equipment_name].get()
-
+            print(f"[read_float_values] Reading {equipment_name} at reg {reg1}")
             # Create a custom function to update the buffer and the label
             def update_value_and_buffer(label, equipment_name, data_type):
                 def _update(value):
@@ -1204,15 +1205,15 @@ class System2:
                     if data_type_lower == "pressure transmitters":
                         data_type_lower = "pressures"  # dictionary name is pressures_dict
                     self.data_collector.buffer_update(data_type_lower, equipment_name, value)
-
+                    print(f"[callback] {equipment_name}: Value received = {value}")
                 return _update
+            print(f'Creating Callback for equiptment {equipment_name}')
+            callback = update_value_and_buffer(label, equipment_name, data_type)
 
-        callback = update_value_and_buffer(label, equipment_name, data_type)
-
-        # Start the reading thread
-        t = threading.Thread(target=lambda: plc_object.read_float(callback, reg1, reg1 + 1))
-        t.daemon = True
-        t.start()
+            # Start the reading thread
+            t = threading.Thread(target=lambda: plc_object.read_float(callback, reg1, reg1 + 1))
+            t.daemon = True
+            t.start()
 
     def write_float_values(self, equipment_type, equipment_name, value):
         """
