@@ -2,6 +2,7 @@ import time
 import threading
 import collections
 from scipy.stats import linregress
+import re
 import numpy as np
 import serial
 
@@ -11,7 +12,7 @@ class PIDControl:
     This controller continuously calculates error between the target flow rate (set point)
     and actual measured flow rate, then adjusts the pump speed to minimize this error.
     """
-    def __init__(self, balance_ser, pump_ser, pump_type, pump_name, graph_obj):
+    def __init__(self, balance_ser, pump_ser, pump_type, pump_name, graph_obj,old_balance = False):
         """
         Initialize PID controller with required components.
         
@@ -39,7 +40,7 @@ class PIDControl:
         self.stop = False
         self.pid_thread = None
         self._exit_thread = False
-
+        self.old_balance = old_balance
     def set_stop(self, boolean):
         """
         Stop or start the PID control loop.
@@ -243,7 +244,7 @@ class PIDControl:
         balance_ser = self.balance_ser
         pump_ser = self.pump_ser
         b = self.Balance(self.max_data_points)
-
+        old_balance = self.old_balance
         last_flow_rate = 0.0
 
         print(f"Starting PID control loop for {self.pump_name}")
@@ -252,31 +253,50 @@ class PIDControl:
             while not self.stop and not self._exit_thread:
                 try:
                     # Read balance data
-                    balance_data = balance_ser.readline().strip()
 
                     # Parse mass value from balance data
-                    if isinstance(balance_data, bytes):
-                        balance_data = balance_data.decode('ascii', errors='ignore')
+
 
                     # Different balance models may output data in different formats
                     try:
-                        parts = balance_data.split()
-                        if len(parts) >= 2:
-                            value = parts[1].strip()
+                        if old_balance:
+                            print('Using Old Balance')
+                            balance_data = balance_ser.readline().strip()
+                            if isinstance(balance_data, bytes):
+                                balance_data = balance_data.decode('ascii', errors='ignore')
+                            parts = balance_data.split()
+                            if len(parts) >= 2:
+                                value = parts[1].strip()
+                            else:
+                                value = balance_data.strip()
+
+                            # Handle different balance output formats
+                            if value.startswith('+') or value.startswith('-'):
+                                print('skip')  # Skipping unstable readings
+                                continue
+
+                            # Extract numeric part (assuming format like "123.45g")
+                            if 'g' in value:
+                                mass_in_float = float(value.split('g')[0])
+                            else:
+                                mass_in_float = float(value)
                         else:
-                            value = balance_data.strip()
-
-                        # Handle different balance output formats
-                        if value.startswith('+') or value.startswith('-'):
-                            print('skip')  # Skipping unstable readings
-                            continue
-
-                        # Extract numeric part (assuming format like "123.45g")
-                        if 'g' in value:
-                            mass_in_float = float(value.split('g')[0])
-                        else:
-                            mass_in_float = float(value)
-
+                            print('Using new balance')
+                            balance_ser.write(b'P\r\n')  # Ask the balance to print
+                            time.sleep(0.5)
+                            lines = []
+                            while balance_ser.in_waiting:
+                                line = balance_ser.readline().decode(errors='ignore').strip()
+                                if line:
+                                    lines.append(line)
+                            print(f'Found the following output from the lines:{lines}')
+                            for l in lines:
+                                if re.search(r'\d+\s+mg', l):  # Look for something like "7710    mg"
+                                        number_str = re.search(r'(\d+)\s+mg', l).group(1)
+                                        mass_mg = float(number_str)
+                                        mass_in_float = mass_mg/1000
+                                        break
+                            print(f'Found this mass:{mass_in_float}')
                         # Update balance with new mass
                         b.mass = mass_in_float
 

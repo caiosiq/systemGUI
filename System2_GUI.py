@@ -25,9 +25,9 @@ class PumpControl:
 
 
 addresses = {
-    'Pumps': [9],
+    'Pumps': [9,10],
     'Balances': {
-        'Pump 1': [5, 6, 7, 8]
+        'Pump 1': [12, 6, 7, 8],
     },
     'Temperatures': [28710, 28712, 28714],
     'Pressure Transmitters': [28750, 28752, 28754],
@@ -127,6 +127,7 @@ class System2:
 
         self.create_temperatures_section()
         self.create_pressure_transmitter_section()
+        # self.create_balance_section()
         self.create_pressure_regulator_section()
         self.create_pressure_inout_section()
         self.create_valves_section()
@@ -238,6 +239,8 @@ class System2:
 
         # Balance data - for PID control
         self.balances_dict = {}
+        # for name in self.balances_list:
+        #     self.balances_dict[name] = [True, True, []]
         # Add entries for each pump channel
         for pump_name in self.pumps_list:
             for channel in range(1, 5):  # 4 channels per pump
@@ -960,6 +963,11 @@ class System2:
         self.create_equipment_section("Pressure Transmitters", self.pressure_transmitters_list,
                                       self.pressure_transmitter_connect, display_current=True)
 
+    def create_balance_section(self):
+        self.balances_list = ["Balance 1", "Balance 2", "Balance 3","Balance4"]
+        self.create_equipment_section("Balances", self.balances_list,
+                                      self.balance_connect, display_current=True)
+
     def create_pressure_regulator_section(self):
         self.pressure_regulators_list = ["Pressure Regulator 1", "Pressure Regulator 2"]
         self.create_equipment_section("Pressure Regulators", self.pressure_regulators_list,
@@ -1007,6 +1015,25 @@ class System2:
             if read_float:
                 plc.reading_onoff(False)
             plc.disconnect()
+    def toggle_balance_connection(self, device_name, plc, read_float=False, plc_object=None, data_type=None):
+        """
+        Method to handle connection to balance.
+        Needs to be different from other methods since it requires a COM connection instead of plc
+        """
+        connect_button = self.connect_dictionary["buttons"][device_name]
+        connect_var = self.connect_dictionary["vars"][device_name]
+
+        if connect_var == 0:  # If not connected, connect
+            self.connect_dictionary["vars"][device_name] = 1
+            plc.connect()
+            if read_float:
+                plc.reading_onoff(True)
+                self.read_float_values(plc_object, data_type)
+        else:  # If connected, disconnect
+            self.connect_dictionary["vars"][device_name] = 0
+            if read_float:
+                plc.reading_onoff(False)
+            plc.disconnect()
 
     def temperature_connect(self):
         self.toggle_connection("Temperatures", self.temperature_plc, read_float=True,
@@ -1016,6 +1043,11 @@ class System2:
         self.toggle_connection("Pressure Transmitters", self.pressure_transmitter_plc,
                                read_float=True, plc_object=self.pressure_transmitter_plc,
                                data_type="Pressure Transmitters")
+    def balance_connect(self):
+        print('Trying to connect to balance')
+        # self.toggle_connection("Balances", self.pressure_transmitter_plc,
+        #                        read_float=True, plc_object=self.pressure_transmitter_plc,
+        #                        data_type="Pressure Transmitters")
 
     def valve_connect(self):
         self.toggle_connection("Valves", self.valve_plc)
@@ -1144,6 +1176,12 @@ class System2:
             title="Pressure Transmitters",
             headers=["Name", "Register 1"],
             items=self.pressure_transmitters_list
+        )
+
+        self.create_assignment_section(
+            title="Balances",
+            headers=["Name", "Register 1"],
+            items=self.balances_list
         )
 
         self.create_assignment_section(
