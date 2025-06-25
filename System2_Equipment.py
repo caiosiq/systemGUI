@@ -211,7 +211,7 @@ class Pump:
         echo = self._write(f"{ch}f{flow_str}\r").strip()
         print(f"[DEBUG] Sent flow string: {flow_str}, Echo: {echo!r}")
         if not (echo.startswith(str(int(flow_mL_min * 1000))) or echo.startswith(flow_str[:4])):
-            raise RuntimeError(f"Pump did not echo flow correctly ({echo!r})")
+            raise RuntimeError(f"Pump did not echo flow correctly ({echo!r}), tried to send {f"{ch}f{flow_str}\r"}")
         ack = self._write(f"{ch}H\r")
         print(f"[DEBUG] Start pump ack: {ack!r}")
         self._check_ack(ack, f"{ch}H")
