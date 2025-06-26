@@ -2,7 +2,7 @@ import tkinter as tk
 import threading
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC
+from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC, Balance
 from System2_utils import Graph, DataCollector
 import serial
 import time
@@ -28,8 +28,9 @@ addresses = {
     # 'Balances': {
     #     'Pump 1': [12, 6, 7, 8],
     # },
-    'Pumps': [9],
-    'Balances':[12,5,6,7],
+    'Pumps': [10],
+    # 'Balances':[12,5,6,7],
+    'Balances':[12],
     'Temperatures': [28710, 28712, 28714],
     'Pressure Transmitters': [28750, 28752, 28754],
     'Pressure Regulators': [28770, 28772],
@@ -139,7 +140,7 @@ class System2:
         plc_host_num = "169.254.83.200"
         self.temperature_plc = ReadFloatsPLC(plc_host_num, 502)
         self.pressure_transmitter_plc = ReadFloatsPLC(plc_host_num, 502)
-
+        self.balance_com = Balance()
         self.pressure_inout_plc = OneBitClass(plc_host_num)
         self.valve_plc = OneBitClass(plc_host_num)
         self.drum_plc = OneBitClass(plc_host_num)
@@ -238,8 +239,8 @@ class System2:
 
         # Balance data
         self.balances_dict = {}
-        # for name in self.balances_list:
-        #     self.balances_dict[name] = [True, True, []]
+        for name in self.balances_list:
+            self.balances_dict[name] = [True, True, []]
         # Add entries for each pump channel
         for pump_name in self.pumps_list:
             for channel in range(1, 5):  # 4 channels per pump
@@ -301,7 +302,7 @@ class System2:
 
         # Create content for balance tab - using pump names as balance identifiers
         balance_frame = tk.Frame(self.tab_content_frame)
-        self.create_series_selectors(balance_frame, "Balances", self.pumps_list)
+        self.create_series_selectors(balance_frame, "Balances", self.balances_list)
         self.tab_frames.append(balance_frame)
 
         # Create content for flow rate tab
@@ -351,7 +352,7 @@ class System2:
 
         expanded_series_list = series_list
         # For flow rates and balances, expand to include all channels
-        if data_type.lower() in ["flow_rates", "balances"]:
+        if data_type.lower() in ["flow_rates"]:
             expanded_series_list = []
             for name in series_list:
                 # Create a frame for each pump's channels to keep them on one row
@@ -387,6 +388,7 @@ class System2:
                     cb.pack(side="left", padx=5)
         else:
             # For temperatures and pressures - use the original grid layout
+            print(f'Setting checkbox for {data_type}')
             for i, name in enumerate(expanded_series_list):
                 # Get the dictionary for this data type
                 data_dict = getattr(self.graph, f"{data_type.lower()}_dict")
@@ -771,7 +773,7 @@ class System2:
                                       self.pressure_transmitter_connect, display_current=True)
 
     def create_balance_section(self):
-        self.balances_list = ["Balance 1", "Balance 2", "Balance 3","Balance4"]
+        self.balances_list = [f"Balance {i+1}" for i in range(len(addresses['Balances']))]
         self.create_equipment_section("Balances", self.balances_list,
                                       self.balance_connect, display_current=True)
 
@@ -822,7 +824,7 @@ class System2:
             if read_float:
                 plc.reading_onoff(False)
             plc.disconnect()
-    def toggle_balance_connection(self, device_name, plc, read_float=False, plc_object=None, data_type=None):
+    def toggle_balance_connection(self, device_name, balance, read_float=False, data_type=None):
         """
         Method to handle connection to balance.
         Needs to be different from other methods since it requires a COM connection instead of plc
@@ -832,15 +834,15 @@ class System2:
 
         if connect_var == 0:  # If not connected, connect
             self.connect_dictionary["vars"][device_name] = 1
-            plc.connect()
+            balance.connect()
             if read_float:
-                plc.reading_onoff(True)
-                self.read_float_values(plc_object, data_type)
+                balance.reading_onoff(True)
+                self.read_balance_float_values(balance, data_type)
         else:  # If connected, disconnect
             self.connect_dictionary["vars"][device_name] = 0
             if read_float:
-                plc.reading_onoff(False)
-            plc.disconnect()
+                balance.reading_onoff(False)
+            balance.disconnect()
 
     def temperature_connect(self):
         self.toggle_connection("Temperatures", self.temperature_plc, read_float=True,
@@ -851,10 +853,10 @@ class System2:
                                read_float=True, plc_object=self.pressure_transmitter_plc,
                                data_type="Pressure Transmitters")
     def balance_connect(self):
-        print('Trying to connect to balance')
-        # self.toggle_connection("Balances", self.pressure_transmitter_plc,
-        #                        read_float=True, plc_object=self.pressure_transmitter_plc,
-        #                        data_type="Pressure Transmitters")
+        print('HERE IS WHAT THE BUTTON FOR BALANCE STARTS: Trying to connect to balance')
+        self.toggle_balance_connection("Balances", self.balance_com,
+                               read_float=True,
+                               data_type="Balances")
 
     def valve_connect(self):
         self.toggle_connection("Valves", self.valve_plc)
@@ -1035,6 +1037,7 @@ class System2:
         data_type is the type of equipment (i.e. Temperatures or Pressure Transmitters)
         """
         print(f"[read_float_values] Starting for type: {data_type}")
+        print(f"Connecting on {data_type}, equipment_data = {self.equipment_data}")
         for equipment_name in self.equipment_data[data_type]:
             label = self.equipment_data[data_type][equipment_name]
             reg1 = self.register_dictionary[data_type][equipment_name].get()
@@ -1050,13 +1053,44 @@ class System2:
                     if data_type_lower == "pressure transmitters":
                         data_type_lower = "pressures"  # dictionary name is pressures_dict
                     self.data_collector.buffer_update(data_type_lower, equipment_name, value)
-                    print(f"[callback] {equipment_name}: Value received = {value}")
+                    # print(f"[callback] {equipment_name}: Value received = {value}")
                 return _update
             print(f'Creating Callback for equiptment {equipment_name}')
             callback = update_value_and_buffer(label, equipment_name, data_type)
 
             # Start the reading thread
             t = threading.Thread(target=lambda: plc_object.read_float(callback, reg1, reg1 + 1))
+            t.daemon = True
+            t.start()
+
+    def read_balance_float_values(self, balance_object, data_type):
+        """
+        For PLC equipment that reads float values with synchronized data collection
+        data_type is the type of equipment (i.e. Temperatures or Pressure Transmitters)
+        """
+        print(f"[read_float_balance_values] Starting for type: {data_type}")
+        for equipment_name in self.equipment_data[data_type]: #FOR EACH BALANCE COM
+            label = self.equipment_data[data_type][equipment_name]
+            COM = self.register_dictionary[data_type][equipment_name].get()
+            print(f"[read_float_values] Reading {equipment_name} at reg {COM}")
+            # Create a custom function to update the buffer and the label
+            def update_value_and_buffer(label, equipment_name, data_type):
+                def _update(value):
+                    # Update the label
+                    label.config(text=str(value))
+
+                    # Update the data collector buffer instead of directly updating the graph
+                    data_type_lower = data_type.lower()
+                    if data_type_lower == "pressure transmitters":
+                        data_type_lower = "pressures"  # dictionary name is pressures_dict
+                    self.data_collector.buffer_update(data_type_lower, equipment_name, value)
+                    # print(f"[callback] {equipment_name}: Value received = {value}")
+                return _update
+            print(f'Creating Callback for equiptment {equipment_name}')
+            callback = update_value_and_buffer(label, equipment_name, data_type)
+
+            # Start the reading thread
+            t = threading.Thread(target=lambda: balance_object.read_float(callback, COM))
             t.daemon = True
             t.start()
 

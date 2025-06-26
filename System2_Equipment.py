@@ -5,7 +5,6 @@ from pymodbus.payload import BinaryPayloadBuilder
 import serial, threading, re
 from time import sleep
 
-
 # https://blog.darwin-microfluidics.com/how-to-control-the-reglo-icc-pump-using-python-and-matlab/
 # class Pump:
 #     """
@@ -221,14 +220,21 @@ class Pump:
         Query the stored flow for channel (does NOT start/stop the pump).
         Returns mL min-¹  (float, rounded 2 dp).
         """
-        resp = self._write(f"{ch}f\r").strip()     # e.g. '5000E-3' or '5000-3'
-        # m = re.match(r"(\d+)(?:E-| -)(\d)", resp)
-        m = re.match(r"(\d+)(?:E[+-]?| -)(\d)", resp)
+        resp = self._write(f"{ch}f\r").strip()  # e.g. '5000E-3' or '5000+3'
+        m = re.match(r"(\d+)(?:E([+-]?\d)|[ +-](\d))", resp)
         if not m:
             raise RuntimeError(f"Unparsable flow echo: {resp!r}")
-        mant, exp = int(m.group(1)), int(m.group(2))
-        μL_min = mant * (10 ** -exp)
-        return round(μL_min / 1000.0, 2)           # → mL/min
+
+        mant = int(m.group(1))
+        if m.group(2) is not None:
+            exp = int(m.group(2))  # Handles E+3, E-3, E3
+        else:
+            exp = -int(m.group(3))  # Legacy format like '5000-3' or '5000 3'
+
+        μL_min = mant * (10 ** exp)
+        return round(μL_min / 1000.0, 2)  # Convert to mL/min
+
+
 
     # -------------- cleanup -------------- #
 
@@ -242,7 +248,59 @@ class Pump:
             self.close()
         except Exception:
             pass
+class Balance:
+    def __init__(self):
+        pass
+    def connect(self):
+        print('Connected to Balance?')
+    def reading_onoff(self,boolean):
+        self.reading = boolean
 
+    def read_float(self, label_or_callback, numbercom):
+        """
+        Inputs in two registers. The second register is optional.
+
+        If two registers are entered, the data is a 32-bit data, else
+        one register means 16-bit.
+
+        The label_or_callback parameter can be either:
+        1. A tk.Label to update directly (for backward compatibility)
+        2. A callback function that receives the value (preferred for graph integration)
+        """
+        print(f'COM of {numbercom}')
+        balance_ser = serial.Serial(f'COM{numbercom}', baudrate=9600, timeout=1)
+        while self.reading:
+            try:
+                balance_ser.write(b'P\r\n')  # Ask the balance to print
+                sleep(0.5)
+                lines = []
+                while balance_ser.in_waiting:
+                    line = balance_ser.readline().decode(errors='ignore').strip()
+                    if line:
+                        lines.append(line)
+                # print(f'Found the following output from the lines:{lines}')
+                for l in lines:
+                    if re.search(r'\d+\s+mg', l):  # Look for something like "7710    mg"
+                        number_str = re.search(r'(\d+)\s+mg', l).group(1)
+                        mass_mg = float(number_str)
+                        mass_in_float = mass_mg / 1000
+                        break
+
+                # Round the value to 3 decimal places
+                current_value = round(mass_in_float, 4)
+
+                # Update the label or call the callback
+                if callable(label_or_callback):
+                    # It's a callback function
+                    label_or_callback(current_value)
+                else:
+                    # It's a label widget (for backward compatibility)
+                    label_or_callback.config(text=str(current_value))
+
+            except Exception as e:
+                print(f"Error reading float: {e}")
+
+            sleep(0.5)
 class PLC:
     def __init__(self, host_num, port_num=None) -> None:
         if port_num:
@@ -259,7 +317,6 @@ class PLC:
     def disconnect(self):
         self.client.close()
         print("Disconnected")
-
 
 # Modified ReadFloatsPLC class to support callbacks
 class ReadFloatsPLC(PLC):
