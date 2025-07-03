@@ -14,7 +14,7 @@ class PumpControl:
     def __init__(self, connect_button):
         self.connect_button = connect_button  # Connect button
         self.channel_dict = {}  # dictionary of channel id mapped to a map of on button, off button, flow rate var
-
+        self.isconnected = False
     def add_channel(self, channel_id, on_button, off_button, flow_var):
         self.channel_dict[channel_id] = {"on_btn": on_button, "off_btn": off_button, "flow_var": flow_var}
 
@@ -28,7 +28,7 @@ addresses = {
     # 'Balances': {
     #     'Pump 1': [12, 6, 7, 8],
     # },
-    'Pumps': [10],
+    'Pumps': [9],
     # 'Balances':[12,5,6,7],
     'Balances':[12],
     'Temperatures': [28710, 28712, 28714],
@@ -97,7 +97,8 @@ class System2:
         self.interior.bind("<Configure>", configure_interior)
 
         gui_frame = tk.Frame(self.interior)
-
+        ### BUTTONS ###
+        self.buttons={}
         ### ---EQUIPMENT--- ###
         self.equipment_frame = tk.Frame(gui_frame)
         enter_button = tk.Button(self.equipment_frame, text="Assign and Read Data", command=self.open_assign)
@@ -545,7 +546,7 @@ class System2:
                 frame, text="Connect", width=12,
                 command=lambda i=i: self.pump_connect(i))
             connect_btn.grid(row=row_index, column=1, padx=10, rowspan=4)
-
+            self.buttons[('pumps', i)] = connect_btn  # Store the button in the dictionary
             # Create a PumpControl object for this pump
             pump_control = PumpControl(connect_btn)
             self.pump_objects[i] = pump_control
@@ -595,47 +596,50 @@ class System2:
 
     def pump_connect(self, pump_index):
         """Handles connecting/disconnecting a pump."""
-        if not self.pump_connect_vars[pump_index]:  # If not connected
-            if not self.pump_port_vars[pump_index]:
-                address = addresses["Pumps"][pump_index]
-                self.pump_port_vars[pump_index] = tk.IntVar(value=address)
+        # if not self.pump_connect_vars[pump_index]:  # If not connected
+        connect_btn = self.buttons[('pumps', pump_index)]
+        if connect_btn:
+            connect_btn.config(state="disabled", relief="sunken", bg="#a9a9a9")
+        if not self.pump_port_vars[pump_index]:
+            address = addresses["Pumps"][pump_index]
+            self.pump_port_vars[pump_index] = tk.IntVar(value=address)
 
-            try:
-                # Get the port number from the pump port variable
-                com_number = str(self.pump_port_vars[pump_index].get())
+        try:
+            # Get the port number from the pump port variable
+            com_number = str(self.pump_port_vars[pump_index].get())
 
-                # Create pump serial object
-                pump_ser = Pump(com_number)
-                pump_ser.set_independent_channel_control()
-                print(f'Connecting pump {pump_index} on COM{com_number}')
+            # Create pump serial object
+            pump_ser = Pump(com_number)
+            pump_ser.set_independent_channel_control()
+            print(f'Connecting pump {pump_index} on COM{com_number}')
 
-                # Update connection state
-                self.pump_connect_vars[pump_index] = True
+            # Update connection state
+            self.pump_connect_vars[pump_index] = True
 
-                # Get the PumpControl object
-                pump_control = self.pump_objects[pump_index]
+            # Get the PumpControl object
+            pump_control = self.pump_objects[pump_index]
 
-                # Set the serial object
-                pump_control.set_serial_obj(pump_ser)
+            # Set the serial object
+            pump_control.set_serial_obj(pump_ser)
 
-            except Exception as e:
-                print(f"Error connecting pump: {e}")
-                tk.messagebox.showerror("Connection Error", f"Failed to connect pump: {e}")
+        except Exception as e:
+            print(f"Error connecting pump: {e}")
+            tk.messagebox.showerror("Connection Error", f"Failed to connect pump: {e}")
 
-        else:  # If already connected
-            try:
-                # Update connection state
-                self.pump_connect_vars[pump_index] = False
-
-                # Get the PumpControl object
-                pump_control = self.pump_objects[pump_index]
-
-                # Clean up serial connection
-                if hasattr(pump_control, 'serial_obj'):
-                    delattr(pump_control, 'serial_obj')
-
-            except Exception as e:
-                print(f"Error disconnecting pump: {e}")
+        # else:  # If already connected
+        #     try:
+        #         # Update connection state
+        #         self.pump_connect_vars[pump_index] = False
+        #
+        #         # Get the PumpControl object
+        #         pump_control = self.pump_objects[pump_index]
+        #
+        #         # Clean up serial connection
+        #         if hasattr(pump_control, 'serial_obj'):
+        #             delattr(pump_control, 'serial_obj')
+        #
+        #     except Exception as e:
+        #         print(f"Error disconnecting pump: {e}")
 
 
     def pump_on(self, pump_index, channel):
@@ -736,7 +740,6 @@ class System2:
                                            command=connect_command)
                 connect_button.grid(row=0, column=0)
                 self.connect_dictionary["buttons"][title] = connect_button
-                self.connect_dictionary["vars"][title] = 0
 
             if entry:  # Pressure regulators and stirrers
                 var = tk.StringVar(value="0")
@@ -811,38 +814,25 @@ class System2:
         :param read_type: String type of data to read if read_float is True.
         """
         connect_button = self.connect_dictionary["buttons"][device_name]
-        connect_var = self.connect_dictionary["vars"][device_name]
+        connect_button.config(state="disabled", relief="sunken", bg="#a9a9a9")
+        plc.connect()
+        if read_float:
+            plc.reading_onoff(True)
+            self.read_float_values(plc_object, data_type)
 
-        if connect_var == 0:  # If not connected, connect
-            self.connect_dictionary["vars"][device_name] = 1
-            plc.connect()
-            if read_float:
-                plc.reading_onoff(True)
-                self.read_float_values(plc_object, data_type)
-        else:  # If connected, disconnect
-            self.connect_dictionary["vars"][device_name] = 0
-            if read_float:
-                plc.reading_onoff(False)
-            plc.disconnect()
     def toggle_balance_connection(self, device_name, balance, read_float=False, data_type=None):
         """
         Method to handle connection to balance.
         Needs to be different from other methods since it requires a COM connection instead of plc
         """
         connect_button = self.connect_dictionary["buttons"][device_name]
-        connect_var = self.connect_dictionary["vars"][device_name]
+        connect_button.config(state="disabled", relief="sunken", bg="#a9a9a9")
 
-        if connect_var == 0:  # If not connected, connect
-            self.connect_dictionary["vars"][device_name] = 1
-            balance.connect()
-            if read_float:
-                balance.reading_onoff(True)
-                self.read_balance_float_values(balance, data_type)
-        else:  # If connected, disconnect
-            self.connect_dictionary["vars"][device_name] = 0
-            if read_float:
-                balance.reading_onoff(False)
-            balance.disconnect()
+        balance.connect()
+        if read_float:
+            balance.reading_onoff(True)
+            self.read_balance_float_values(balance, data_type)
+
 
     def temperature_connect(self):
         self.toggle_connection("Temperatures", self.temperature_plc, read_float=True,
