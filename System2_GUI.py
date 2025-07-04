@@ -529,8 +529,8 @@ class System2:
         frame = tk.Frame(self.equipment_frame)
         tk.Label(frame, text="Pumps", font=("Arial", 16, "underline")).grid(sticky="w", row=0, column=0)
 
-        # Column headers
-        headers = ["Connect", "Channel Number", "On", "Off", "Flow Rates", "Set Flow Rates"]
+        # Updated headers (removed "On" and "Off")
+        headers = ["Connect", "Channel Number", "Flow Rates", "Set Flow Rates"]
         for col, text in enumerate(headers, start=1):
             tk.Label(frame, text=text, font=("Arial", 12, "bold")).grid(row=1, column=col)
 
@@ -546,7 +546,7 @@ class System2:
                 frame, text="Connect", width=12,
                 command=lambda i=i: self.pump_connect(i))
             connect_btn.grid(row=row_index, column=1, padx=10, rowspan=4)
-            self.buttons[('pumps', i)] = connect_btn  # Store the button in the dictionary
+            self.buttons[('pumps', i)] = connect_btn
             # Create a PumpControl object for this pump
             pump_control = PumpControl(connect_btn)
             self.pump_objects[i] = pump_control
@@ -560,36 +560,26 @@ class System2:
                 channel_label = tk.Label(frame, text=f"{channel_num}")
                 channel_label.grid(row=row_index + j, column=2, padx=10)
 
-                # On/Off buttons
-                on_btn = tk.Button(
-                    frame, text="On", width=7, state=tk.DISABLED,
-                    command=lambda i=i, ch=channel_num: self.pump_on(i, ch))
-                on_btn.grid(row=row_index + j, column=3, padx=10)
-
-                off_btn = tk.Button(
-                    frame, text="Off", width=7, state=tk.DISABLED,
-                    command=lambda i=i, ch=channel_num: self.pump_off(i, ch))
-                off_btn.grid(row=row_index + j, column=4, padx=10)
-
                 # Flow rate entry and set button
                 flow_var = tk.StringVar()
                 flow_entry = tk.Entry(frame, textvariable=flow_var, width=15)
-                flow_entry.grid(row=row_index + j, column=5, padx=10)
+                flow_entry.grid(row=row_index + j, column=3, padx=10)
 
                 set_flow_btn = tk.Button(
                     frame, text="Set", width=5,
                     command=lambda i=i, ch=channel_num, v=flow_var: self.pump_set_flow_rate(i, ch, v))
-                set_flow_btn.grid(row=row_index + j, column=6)
+                set_flow_btn.grid(row=row_index + j, column=4)
 
                 # Add this channel to the pump control object
-                pump_control.add_channel(channel_id, on_btn, off_btn, flow_var)
+                # Pass None for on/off buttons since they are removed
+                pump_control.add_channel(channel_id, None, None, flow_var)
 
             row_index += 4
 
-            # Add a separator between pumps
+            # Update separator columnspan (was 7, now 5)
             if i < len(self.pumps_list) - 1:
                 separator = tk.Frame(frame, height=2, bd=1, relief=tk.SUNKEN)
-                separator.grid(row=row_index, column=0, columnspan=7, sticky="ew", pady=5)
+                separator.grid(row=row_index, column=0, columnspan=5, sticky="ew", pady=5)
                 row_index += 1
 
         frame.pack(anchor="nw", padx=15, pady=15)
@@ -754,12 +744,16 @@ class System2:
                 self.register_dictionary[title][name] = tk.IntVar(value=address)
 
             if onoff_buttons:  # Pressure in/outs and valves
-                tk.Button(frame, text="On", width=10,
-                          command=lambda t=title, n=name: self.toggle_onoff(t, n, True)).grid(row=i + 1, column=1,
-                                                                                              padx=15)
-                tk.Button(frame, text="Off", width=10,
-                          command=lambda t=title, n=name: self.toggle_onoff(t, n, False)).grid(row=i + 1, column=2,
-                                                                                               padx=15)
+                on_btn = tk.Button(frame, text="On", width=10)
+                off_btn = tk.Button(frame, text="Off", width=10)
+                on_btn.config(relief=tk.RAISED, state=tk.NORMAL)
+                off_btn.config(relief=tk.RAISED, state=tk.NORMAL)
+                # Define command after both buttons exist
+                on_btn.config(command=lambda t=title, n=name, on_btn=on_btn, off_btn=off_btn: self.toggle_onoff(t, n, True, on_btn, off_btn))
+                off_btn.config(command=lambda t=title, n=name,on_btn=on_btn, off_btn=off_btn: self.toggle_onoff(t, n, False, on_btn, off_btn))
+
+                on_btn.grid(row=i + 1, column=1, padx=15)
+                off_btn.grid(row=i + 1, column=2, padx=15)
                 address = addresses[title][i]
                 self.register_dictionary[title][name] = tk.IntVar(value=address)
 
@@ -1097,11 +1091,17 @@ class System2:
         reg1 = self.register_dictionary[equipment_type][equipment_name].get()
         plc_object.write_float(reg1, value)
 
-    def toggle_onoff(self, equipment_type, equipment_name, boolean):
+    def toggle_onoff(self, equipment_type, equipment_name, boolean, on_btn, off_btn):
         """
         Turn equipment on or off
         equipment type is "Pressure In/Outs" or "Valves"
         """
+        if boolean:
+            on_btn.config(state=tk.DISABLED, relief=tk.SUNKEN)
+            off_btn.config(state=tk.NORMAL, relief=tk.RAISED)
+        else:
+            off_btn.config(state=tk.DISABLED, relief=tk.SUNKEN)
+            on_btn.config(state=tk.NORMAL, relief=tk.RAISED)
         if equipment_type == "Pressure In/Outs":
             plc_object = self.pressure_inout_plc
         elif equipment_type == "Valves":
