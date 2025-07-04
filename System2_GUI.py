@@ -37,7 +37,7 @@ addresses = {
     'Pressure In/Outs': [8352, 8353, 8354, 8355, 8356, 8357],
     'Valves': [8358],
     'Stirrers': [28790, 28792, 28794],
-    'Drums': [16387]
+    'Continuous Operation - Pressure Driven': [16387]
 }
 
 class System2:
@@ -278,7 +278,6 @@ class System2:
         self.tab_buttons = []
         self.tab_frames = []
 
-        # Add "Balance" to the tab names
         tab_names = ["Temperatures", "Pressures", "Balances", "Flow_Rates"]
 
         for i, name in enumerate(tab_names):
@@ -682,6 +681,14 @@ class System2:
     def pump_set_flow_rate(self, pump_index, channel, flow_var):
         if not self.pump_connect_vars[pump_index]:
             return
+        pump_control = self.pump_objects[pump_index]
+        flow_rate = float(flow_var.get())
+        pump_control.serial_obj.set_speed(channel, flow_rate)
+
+        channel_name = f"{self.pumps_list[pump_index]}_Ch{channel}"
+
+        # Start polling pump output
+        self.start_flow_polling(channel_name, pump_control.serial_obj, channel)
 
         try:
             pump_control = self.pump_objects[pump_index]
@@ -794,8 +801,8 @@ class System2:
         self.create_equipment_section("Stirrers", self.stirrers_list, self.stirrer_connect, entry=True)
 
     def create_drum_section(self):
-        self.drums_list = ["Drum 1"]
-        self.create_equipment_section("Drums", self.drums_list, self.drum_connect, onoff_buttons=True)
+        self.drums_list = ["Pressure Driven 1"]
+        self.create_equipment_section("Continuous Operation - Pressure Driven", self.drums_list, self.drum_connect, onoff_buttons=True)
 
     def toggle_connection(self, device_name, plc, read_float=False, plc_object=None, data_type=None):
         """
@@ -855,7 +862,7 @@ class System2:
         self.toggle_connection("Stirrers", self.stirrer_plc)
 
     def drum_connect(self):
-        self.toggle_connection("Drums", self.drum_plc)
+        self.toggle_connection("Continuous Operation - Pressure Driven", self.drum_plc)
 
     def create_assignment_section(self, title, headers, items):
         frame = tk.Frame(self.scrollable_frame)
@@ -1002,7 +1009,7 @@ class System2:
         )
 
         self.create_assignment_section(
-            title="Drums",
+            title="Continuous Operation - Pressure Driven",
             headers=["Name", "Register 1"],
             items=self.drums_list
         )
@@ -1106,9 +1113,10 @@ class System2:
             plc_object = self.pressure_inout_plc
         elif equipment_type == "Valves":
             plc_object = self.valve_plc
-        elif equipment_type == "Drums":
+        elif equipment_type == "Continuous Operation - Pressure Driven":
             plc_object = self.drum_plc
-
+        else:
+            print(f"Equipment type {equipment_type} not found")
         address = self.register_dictionary[equipment_type][equipment_name].get()
         plc_object.write_onoff(address, boolean)
 

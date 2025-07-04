@@ -39,7 +39,7 @@ class Graph:
             'Temperatures': {'index': 0, 'ylabel': 'Temperature (°C)', 'color_map': 'inferno'},
             'Pressures': {'index': 1, 'ylabel': 'Pressure (psi)', 'color_map': 'viridis'},
             'Balances': {'index': 2, 'ylabel': 'Balance (g)', 'color_map': 'cividis'},
-            'Flow_Rates': {'index': 3, 'ylabel': 'Flow_Rate (mL/min)', 'color_map': 'plasma'}
+            'Flow_Rates': {'index': 3, 'ylabel': 'Flow Rate (mL/min)', 'color_map': 'plasma'}
         }
         
         self.color_map = {}
@@ -106,7 +106,11 @@ class Graph:
             for label, properties in self.plot_properties.items():
                 label = label[:-1] # remove s from the end of the label
                 idx = properties['index']
-                plots[idx].set_title(f'{label} Over Time')
+                if label == 'Flow_Rate':
+                    title= "Flow Rate Over Time"
+                else:
+                    title = f'{label} Over Time'
+                plots[idx].set_title(title)
                 plots[idx].set_xlabel('Time (s)')
                 plots[idx].set_ylabel(properties['ylabel'])
                 plots[idx].grid(True, linestyle='--', alpha=0.7)
@@ -316,7 +320,10 @@ class Graph:
             # Create a sheet for this data type
             if i == 0:  # Use the default sheet for the first data type
                 ws = wb.active
-                ws.title = data_type
+                if data_type == "Flow_Rates":
+                    ws.title = "Flow Rates"
+                else:
+                    ws.title = data_type
             else:
                 ws = wb.create_sheet(title=data_type)
             
