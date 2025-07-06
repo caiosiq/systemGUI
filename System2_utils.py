@@ -38,7 +38,7 @@ class Graph:
         self.plot_properties = {
             'Temperatures': {'index': 0, 'ylabel': 'Temperature (°C)', 'color_map': 'inferno'},
             'Pressures': {'index': 1, 'ylabel': 'Pressure (psi)', 'color_map': 'viridis'},
-            'Balances': {'index': 2, 'ylabel': 'Balance (g)', 'color_map': 'cividis'},
+            'Balances': {'index': 2, 'ylabel': 'Mass (g)', 'color_map': 'cividis'},
             'Flow_Rates': {'index': 3, 'ylabel': 'Flow Rate (mL/min)', 'color_map': 'plasma'}
         }
         
