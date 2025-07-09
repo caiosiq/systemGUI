@@ -22,13 +22,108 @@ class PumpControl:
         print('Setting pump serial object')
         self.serial_obj = serial_obj
 
+class CrystallizerGUI:
+    def __init__(self, GUI,address,name):
+        self.fullgui= GUI
+        self.address = address
+        self.root = GUI.equipment_frame
+        self.row = GUI.current_row
+        self.name = name
+        self.step_count = 2  # Initial number of steps
+        self.entries = []
 
+    def render_rows(self):
+        for row in range(self.step_count):
+            row_entries = []
+            for col in range(len(self.headers)):
+                if col == 0:
+                    lbl = tk.Label(self.frame, text=str(row + 1), font=("Arial", 10))
+                    lbl.grid(row=row + 2, column=col)
+                    row_entries.append(lbl)
+                else:
+                    entry = tk.Entry(self.frame)
+                    entry.grid(row=row + 2, column=col)
+                    row_entries.append(entry)
+            self.entries.append(row_entries)
+
+    def add_row(self):
+        row = self.step_count
+        row_entries = []
+        for col in range(len(self.headers)):
+            if col == 0:
+                lbl = tk.Label(self.frame, text=str(row + 1), font=("Arial", 10))
+                lbl.grid(row=row + 2, column=col)
+                row_entries.append(lbl)
+            else:
+                entry = tk.Entry(self.frame)
+                entry.grid(row=row + 2, column=col)
+                row_entries.append(entry)
+        self.entries.append(row_entries)
+        self.step_count += 1
+        self.add_button.grid(row=self.step_count + 2, column=len(self.headers) - 1, sticky="e")
+        self.run_button.grid(row=self.step_count + 3, column=0, columnspan=len(self.headers), pady=10)
+    def create_crystallizer_ui(self):
+        root = self.root
+        row = self.row
+        name = self.name
+        self.frame = tk.Frame(root)
+        self.frame.pack(anchor="nw", padx=15, pady=15)
+
+        tk.Label(self.frame, text=f"Crystallizer {name}", font=("Arial", 18, "underline")).grid(sticky="w", row=0,
+                                                                                             column=0)
+
+        self.headers = [
+            "Step",
+            "Temperature\n(°C)",
+            "Cooling/\nHeating Rate\n(°C/min)",
+            "Duration\n(hh:mm:ss)",
+            "Flow Rate 1\n(mL/min)",
+            "Flow Rate 2\n(mL/min)",
+            "Flow Rate 3\n(mL/min)",
+            "Flow Rate 4\n(mL/min)"
+        ]
+
+        for col, text in enumerate(self.headers):
+            tk.Label(self.frame, text=text, font=("Arial", 10, "bold"), justify="center").grid(row=1, column=col)
+
+        self.render_rows()
+
+        self.add_button = tk.Button(self.frame, text="+", command=self.add_row, font=("Arial", 14, "bold"))
+        self.add_button.grid(row=self.step_count + 2, column=len(self.headers) - 1, sticky="e")
+
+        # "Run" Button
+        self.run_button = tk.Button(self.frame, text="Run", command=self.run_sequence, font=("Arial", 14, "bold"))
+        self.run_button.grid(row=self.step_count + 3, column=0, columnspan=len(self.headers), pady=10)
+
+    def run_sequence(self):
+        steps = []
+        for row_entries in self.entries:
+            step_data = {}
+            try:
+                step_data["temperature"] = float(row_entries[1].get())
+                step_data["rate"] = float(row_entries[2].get())
+                step_data["duration"] = float(row_entries[3].get())  # Keep as string, parse later
+                step_data["flow1"] = float(row_entries[4].get())
+                step_data["flow2"] = float(row_entries[5].get())
+                step_data["flow3"] = float(row_entries[6].get())
+                step_data["flow4"] = float(row_entries[7].get())
+            except ValueError:
+                print(f"Invalid input in row {row_entries[0].cget('text')} — skipping")
+                continue
+            steps.append(step_data)
+
+        try:
+            self.fullgui.crystallizer_run(self.address, steps)
+        except AttributeError:
+            print("Error: GUI class does not implement crystallizer_run(name, steps)")
 addresses = {
     # 'Pumps': [9,10],
     # 'Balances': {
     #     'Pump 1': [12, 6, 7, 8],
     # },
+    'Crystallizers':{'Crystallizer 1':(9,11)}, #First element is the Pump COM, second is the Peltier COM
     'Pumps': [9],
+    'Peltier': [11,20],
     # 'Balances':[12,5,6,7],
     'Balances':[12],
     'Temperatures': [28710, 28712, 28714],
@@ -45,7 +140,7 @@ class System2:
         self.root = tk.Tk()
         self.root.title("System Two Control Panel")
         self.root.state('zoomed')  # Maximize window
-
+        self.current_row=0
         main_frame = tk.Frame(self.root)
         main_frame.pack(fill="both", expand=True)
 
@@ -105,15 +200,25 @@ class System2:
         enter_button.pack(anchor="nw", padx=15, pady=15)
 
         ### --- PUMPS --- ###
-        self.pumps_list = ["Pump 1"]
+        self.pumps_list = [f"Pump {i+1}" for i in range(len(addresses['Pumps']))]
         self.pump_connect_vars = [False] * len(self.pumps_list)
         self.pump_port_vars = [None] * len(self.pumps_list)
         self.pump_objects = {}
         self.pump_controls = {} 
         self.pump_plot_on = False
         self.create_pump_ui()
+
         self.pump_polling_threads = {}
         self.stop_polling_flags = {}
+        self.current_row+=1
+        ### --- Crystallize Control --- ###
+        self.crystallizer_list = [f"Crystallizer {i+1}" for i in range(len(addresses['Crystallizers']))]
+        for i,crystallizer in enumerate(addresses['Crystallizers'].keys()):
+            address_list = list(addresses['Crystallizers'][crystallizer])
+            Crystallizer = CrystallizerGUI(self,address_list,i+1)
+            Crystallizer.create_crystallizer_ui()
+            self.current_row+=1
+
 
         # Maps equipment type to a dictionary that maps a specific equipment to either the current_label
         # for temp and pressure transmitters, or the current value variable for pressure regulator and stirrer
@@ -499,7 +604,11 @@ class System2:
         """Clear all graph data"""
         if tk.messagebox.askyesno("Clear Data", "Are you sure you want to clear all graph data?"):
             self.graph.clear_data()
-
+    # crystalizer
+    def crystallizer_run(self,address_list, steps):
+        print('Crystallizer run')
+        print(f'Address list: {address_list}')
+        print(f'Steps: {steps}')
     # pumps
     def start_flow_polling(self, channel_name, pump_ser, channel):
         if channel_name in self.pump_polling_threads:
@@ -716,6 +825,7 @@ class System2:
     # other
     def create_equipment_section(self, title, items, connect_command, display_current=False, entry=False,
                                  onoff_buttons=False):
+        start = self.current_row
         frame = tk.Frame(self.equipment_frame)
         tk.Label(self.equipment_frame, text=title, font=("Arial", 16, "underline")).pack(anchor="nw", padx=15,
                                                                                          pady=(10, 0))
@@ -724,10 +834,10 @@ class System2:
         self.register_dictionary[title] = {}
 
         for i, name in enumerate(items):
-            tk.Label(frame, text=name).grid(row=i + 1, column=0, sticky="w", pady=5)
+            tk.Label(frame, text=name).grid(row=i + start, column=0, sticky="w", pady=5)
             if display_current:  # Temperatures and pressure trasmitters // read float class
                 current_label = tk.Label(frame, text='', bg="white", borderwidth=1, relief="raised", width=10)
-                current_label.grid(row=i + 1, column=1, padx=15)
+                current_label.grid(row=i + start, column=1, padx=15)
                 self.equipment_data[title][name] = current_label
                 address = addresses[title][i]
                 self.register_dictionary[title][name] = tk.IntVar(value=address)
@@ -741,11 +851,11 @@ class System2:
             if entry:  # Pressure regulators and stirrers
                 var = tk.StringVar(value="0")
                 entry_field = tk.Entry(frame, textvariable=var)
-                entry_field.grid(row=i + 1, column=1, padx=15, pady=5)
+                entry_field.grid(row=i + start, column=1, padx=15, pady=5)
                 self.equipment_data[title][name] = var
                 (tk.Button(frame, text="Enter",
                            command=lambda t=title, n=name, v=var: self.write_float_values(t, n, float(v.get()))
-                           ).grid(row=i + 1, column=2)
+                           ).grid(row=i + start, column=2)
                  )
                 address = addresses[title][i]
                 self.register_dictionary[title][name] = tk.IntVar(value=address)
@@ -759,12 +869,16 @@ class System2:
                 on_btn.config(command=lambda t=title, n=name, on_btn=on_btn, off_btn=off_btn: self.toggle_onoff(t, n, True, on_btn, off_btn))
                 off_btn.config(command=lambda t=title, n=name,on_btn=on_btn, off_btn=off_btn: self.toggle_onoff(t, n, False, on_btn, off_btn))
 
-                on_btn.grid(row=i + 1, column=1, padx=15)
-                off_btn.grid(row=i + 1, column=2, padx=15)
+                on_btn.grid(row=i + start, column=1, padx=15)
+                off_btn.grid(row=i + start, column=2, padx=15)
                 address = addresses[title][i]
                 self.register_dictionary[title][name] = tk.IntVar(value=address)
 
         frame.pack(anchor="nw", padx=15)
+    def create_peltier_section(self):
+        self.peltier_list = [f"Peltier {i+1}" for i in range(len(addresses['Peltiers']))]
+        self.create_equipment_section("Crystalizer 1", self.temperatures_list, self.temperature_connect,
+                                      display_current=True)
 
     def create_temperatures_section(self):
         self.temperatures_list = ["Temperature 1", "Temperature 2", "Temperature 3"]

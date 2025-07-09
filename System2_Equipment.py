@@ -4,7 +4,7 @@ from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadBuilder
 import serial, threading, re
 from time import sleep
-
+import Py_TC720
 # https://blog.darwin-microfluidics.com/how-to-control-the-reglo-icc-pump-using-python-and-matlab/
 # class Pump:
 #     """
@@ -386,3 +386,14 @@ class WriteFloatsPLC(PLC):
 
         except Exception as e:
             print(f"Exception in write_float: {e}")
+
+class Peltier:
+    def __init__(self, com_num):
+        device = Py_TC720.TC720('COM11')
+        self.device = device
+
+    def set_temp(self, temp,verbose = False):
+        self.device.set_temp(temp)
+
+    def set_ramp(self,params,verbose = False):
+        pass
