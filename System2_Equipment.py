@@ -248,6 +248,46 @@ class Pump:
             self.close()
         except Exception:
             pass
+
+class Peltier:
+    def __init__(self):
+        self.locations={}
+
+    def write_float(self, reg1, value):
+        print(f"Writing value: {value} to registers {reg1}")
+        my_device = Py_TC720.TC720(f'COM{reg1}')
+        my_device.set_mode(0)
+        my_device.set_temp(value)
+
+    def send_peltier_sequence(self, reg1, sequence,init_temp,repeat_count, rest_temp):
+        device = Py_TC720.TC720(f'COM{reg1}',mode=1)
+        print(f"Sending sequence {sequence} to COM{reg1}")
+        current_temp = device.get_temp1()
+        device.set_single_sequence(1, temp=init_temp, ramp_time=int(abs(init_temp-current_temp)*30),
+                                   soak_time=int(abs(init_temp-current_temp)*5), go_to=2, repeats = 0)
+
+        for i, action in enumerate(sequence):
+            if i >6:
+                break
+            print(f"\n--- Step {i + 1} ---")
+
+            temp = action['temp']
+            soak_time = action['soak_time']
+            ramp_time = action['ramp_time']
+
+            location = i+2
+            if i==len(sequence)-1:
+                go_to = 2
+            else:
+                go_to = location+1
+            print('Going to:',go_to)
+            device.set_single_sequence(location, temp=temp, ramp_time=ramp_time,
+                                       soak_time=soak_time,go_to=go_to,repeats=repeat_count)
+        device.set_single_sequence(len(sequence)+2, temp=init_temp, ramp_time=int(abs(rest_temp - temp) * 30),
+                                   soak_time=60, go_to=len(sequence)+2, repeats=4)
+        device.start_soak()
+        print('Setting up sequence of:',device.get_sequence(location='all'))
+
 class Balance:
     def __init__(self):
         pass
@@ -387,13 +427,3 @@ class WriteFloatsPLC(PLC):
         except Exception as e:
             print(f"Exception in write_float: {e}")
 
-class Peltier:
-    def __init__(self, com_num):
-        device = Py_TC720.TC720('COM11')
-        self.device = device
-
-    def set_temp(self, temp,verbose = False):
-        self.device.set_temp(temp)
-
-    def set_ramp(self,params,verbose = False):
-        pass

@@ -749,7 +749,8 @@ class TC720():
         Input:
         `location`(int): locations 1-8.
         `time`(int): Number of seconds that the ramp should take.
-
+        T1 = 3 --> T2=10, 5 seconds
+        set_ramp_time(7, 5)
         """
         # Check input
         self.validate_data(location)
@@ -820,13 +821,14 @@ class TC720():
         self.check_mode(1)
 
         location_code = 'e' + str(location - 1)
+        print('After going to location {} repeat location {}'.format(location, repeat_loc))
         self.send_message(self.message_builder(location_code, self.int_to_hex(repeat_loc)), write=True)
 
     # --------------------------------------------------------------------------
     #    Start stop functions
     # --------------------------------------------------------------------------
 
-    def start_soak(self):
+    def start_soak(self,n=8):
         """
         Start the ramp/soak temperature control and execute all sequences
         in the locations.
@@ -835,9 +837,9 @@ class TC720():
         # Check mode
         self.check_mode(1)
         # Start soak
-        self.send_message(self.message_builder('08', '0001'))
+        self.send_message(self.message_builder(f'0{n}', '0001'))
 
-    def idle_soak(self):
+    def idle_soak(self,n=8):
         """
         Stop the ramp/soak execution.
 
@@ -845,7 +847,7 @@ class TC720():
         # Check mode
         self.check_mode(1)
         # Set to idle
-        self.send_message(self.message_builder('08', '0000'))
+        self.send_message(self.message_builder(f'0{n}', '0000'))
 
     def set_idle(self):
         """
@@ -933,11 +935,11 @@ class TC720():
         if go_to == None:
             l = [1, 2, 3, 4, 5, 6, 7, 8]
             next_loc = l[((location) % 8)]
-        elif type(go_to) != int or (1 < repeat_loc > 8):
+        elif type(go_to) != int:
             raise ValueError(
                 'Invalid go_to: "{}", type: "{}". Must be a integer in the range 1-8.'.format(go_to, type(go_to)))
         else:
-            next_loc = location + 100
+            next_loc = go_to
         self.set_repeat_location(location, next_loc)
 
     # ==========================================================================

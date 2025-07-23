@@ -58,7 +58,7 @@ class Graph:
         
         # For tracking time window
         self.start_time = None
-        self.time_window = 120  # Default time window in seconds
+        self.time_window = 3000  # Default time window in seconds
 
     def toggle_all_series(self, dict_type):
         """
@@ -166,7 +166,8 @@ class Graph:
                             self.value_ranges[label]['max'] + padding
                         )
                     
-                    p.legend(loc='upper right', fontsize=8)
+
+                    p.legend(loc="best", framealpha=0.5, fontsize=8)
             
             # Adjust the time window - dynamic based on available data
             latest_times = []

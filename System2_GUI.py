@@ -1,8 +1,12 @@
 import tkinter as tk
+from tkinter import ttk
+
 import threading
+from ast import Index
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC, Balance
+from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC, Balance, Peltier
 from System2_utils import Graph, DataCollector
 import serial
 import time
@@ -31,18 +35,19 @@ class CrystallizerGUI:
         self.name = name
         self.step_count = 2  # Initial number of steps
         self.entries = []
-
+        self.repeat_entry = None
+        self.rest_temp_entry = None
     def render_rows(self):
         for row in range(self.step_count):
             row_entries = []
             for col in range(len(self.headers)):
                 if col == 0:
                     lbl = tk.Label(self.frame, text=str(row + 1), font=("Arial", 10))
-                    lbl.grid(row=row + 2, column=col)
+                    lbl.grid(row=row + 3, column=col)
                     row_entries.append(lbl)
                 else:
                     entry = tk.Entry(self.frame)
-                    entry.grid(row=row + 2, column=col)
+                    entry.grid(row=row + 3, column=col)
                     row_entries.append(entry)
             self.entries.append(row_entries)
 
@@ -52,25 +57,44 @@ class CrystallizerGUI:
         for col in range(len(self.headers)):
             if col == 0:
                 lbl = tk.Label(self.frame, text=str(row + 1), font=("Arial", 10))
-                lbl.grid(row=row + 2, column=col)
+                lbl.grid(row=row + 3, column=col)
                 row_entries.append(lbl)
             else:
                 entry = tk.Entry(self.frame)
-                entry.grid(row=row + 2, column=col)
+                entry.grid(row=row + 3, column=col)
                 row_entries.append(entry)
         self.entries.append(row_entries)
         self.step_count += 1
-        self.add_button.grid(row=self.step_count + 2, column=len(self.headers) - 1, sticky="e")
-        self.run_button.grid(row=self.step_count + 3, column=0, columnspan=len(self.headers), pady=10)
+        self.render_functionalities()
+    def open_popup(self):
+        self.create_crystallizer_ui()
+    def render_functionalities(self):
+        self.add_button.grid(row=self.step_count + 3, column=len(self.headers) - 1, sticky="e")
+        self.repeat_label.grid(row=self.step_count + 4, column=0, sticky="w", pady=(10, 0))
+        self.repeat_entry.grid(row=self.step_count + 4, column=1, sticky="w", pady=(10, 0))
+        self.rest_label.grid(row=self.step_count + 5, column=0, sticky="w", pady=(10, 0))
+        self.rest_temp_entry.grid(row=self.step_count +5 , column=1, sticky="w", pady=(10, 0))
+        self.run_button.grid(row=self.step_count + 6, column=0, columnspan=len(self.headers), pady=10)
     def create_crystallizer_ui(self):
-        root = self.root
         row = self.row
         name = self.name
-        self.frame = tk.Frame(root)
-        self.frame.pack(anchor="nw", padx=15, pady=15)
+
+        if self.fullgui.different_tabs:
+            self.frame = tk.Frame(self.fullgui.notebook)
+            self.frame.pack(anchor="nw", padx=15, pady=15)
+            self.fullgui.notebook.add(self.frame, text=f"Crystallizer {self.name}")
+        else:
+            popup = tk.Toplevel(self.root)
+            popup.title(f"Crystallizer {self.name}")
+            self.frame = tk.Frame(popup)
+            self.frame.pack(anchor="nw", padx=15, pady=15)
 
         tk.Label(self.frame, text=f"Crystallizer {name}", font=("Arial", 18, "underline")).grid(sticky="w", row=0,
                                                                                              column=0)
+        self.init_label = tk.Label(self.frame, text="Initial Temperature", font=("Arial", 10, "bold"))
+        self.init_temp_entry = tk.Entry(self.frame)
+        self.init_label.grid(row=1, column=0, sticky="w", pady=(10, 0))
+        self.init_temp_entry.grid(row=1, column=1, sticky="w", pady=(10, 0))
 
         self.headers = [
             "Step",
@@ -84,38 +108,62 @@ class CrystallizerGUI:
         ]
 
         for col, text in enumerate(self.headers):
-            tk.Label(self.frame, text=text, font=("Arial", 10, "bold"), justify="center").grid(row=1, column=col)
+            tk.Label(self.frame, text=text, font=("Arial", 10, "bold"), justify="center").grid(row=2, column=col)
+
 
         self.render_rows()
-
+        # Add button
         self.add_button = tk.Button(self.frame, text="+", command=self.add_row, font=("Arial", 14, "bold"))
-        self.add_button.grid(row=self.step_count + 2, column=len(self.headers) - 1, sticky="e")
-
-        # "Run" Button
+        # Repeat steps section
+        self.repeat_label = tk.Label(self.frame, text="Repeat steps", font=("Arial", 10))
+        self.repeat_entry = tk.Entry(self.frame, width=10)
+        # Rest temperature row
+        self.rest_label = tk.Label(self.frame, text="Rest Temperature", font=("Arial", 10, "bold"))
+        self.rest_temp_entry = tk.Entry(self.frame)
+        # Run button
         self.run_button = tk.Button(self.frame, text="Run", command=self.run_sequence, font=("Arial", 14, "bold"))
-        self.run_button.grid(row=self.step_count + 3, column=0, columnspan=len(self.headers), pady=10)
+        self.render_functionalities()
+
+
+
+
 
     def run_sequence(self):
         steps = []
+
+
         for row_entries in self.entries:
             step_data = {}
             try:
                 step_data["temperature"] = float(row_entries[1].get())
                 step_data["rate"] = float(row_entries[2].get())
-                step_data["duration"] = float(row_entries[3].get())  # Keep as string, parse later
-                step_data["flow1"] = float(row_entries[4].get())
-                step_data["flow2"] = float(row_entries[5].get())
-                step_data["flow3"] = float(row_entries[6].get())
-                step_data["flow4"] = float(row_entries[7].get())
-            except ValueError:
+                step_data["duration"] = str(row_entries[3].get())  # Keep as string, parse later
+                for i, key in enumerate(["flow1", "flow2", "flow3", "flow4"], start=4):
+                    val = row_entries[i].get()
+                    step_data[key] = float(val) if val.strip() != "" else None
+            except ValueError as e:
                 print(f"Invalid input in row {row_entries[0].cget('text')} — skipping")
+                print(e)
                 continue
             steps.append(step_data)
+        try:
+            init_temp = float(self.init_temp_entry.get())
+        except (ValueError, AttributeError):
+            init_temp = 25
+        try:
+            rest_temp = float(self.rest_temp_entry.get())
+        except (ValueError, AttributeError):
+            rest_temp = 25
+        try:
+            repeat_count = int(self.repeat_entry.get())
+        except (ValueError, AttributeError):
+            repeat_count = 1  # Default to 1 if not specified or invalid
+
 
         try:
-            self.fullgui.crystallizer_run(self.address, steps)
-        except AttributeError:
-            print("Error: GUI class does not implement crystallizer_run(name, steps)")
+            self.fullgui.crystallizer_run(self.address, steps, init_temp, rest_temp, repeat_count)
+        except AttributeError as e:
+            print(f"Error: GUI class does not implement crystallizer_run(name, steps, init_temp, rest_temp, repeat_count): {e}")
 addresses = {
     # 'Pumps': [9,10],
     # 'Balances': {
@@ -123,7 +171,7 @@ addresses = {
     # },
     'Crystallizers':{'Crystallizer 1':(9,11)}, #First element is the Pump COM, second is the Peltier COM
     'Pumps': [9],
-    'Peltier': [11,20],
+    'Peltiers': [11,20],
     # 'Balances':[12,5,6,7],
     'Balances':[12],
     'Temperatures': [28710, 28712, 28714],
@@ -137,10 +185,13 @@ addresses = {
 
 class System2:
     def __init__(self):
+        # style = ttk.Style()
+        # style.theme_use("clam")
         self.root = tk.Tk()
         self.root.title("System Two Control Panel")
         self.root.state('zoomed')  # Maximize window
         self.current_row=0
+        self.different_tabs = False
         main_frame = tk.Frame(self.root)
         main_frame.pack(fill="both", expand=True)
 
@@ -191,11 +242,23 @@ class System2:
 
         self.interior.bind("<Configure>", configure_interior)
 
-        gui_frame = tk.Frame(self.interior)
+
         ### BUTTONS ###
         self.buttons={}
         ### ---EQUIPMENT--- ###
-        self.equipment_frame = tk.Frame(gui_frame)
+
+        if self.different_tabs:
+            self.notebook = ttk.Notebook(self.interior)
+            self.notebook.pack(fill="both", expand=True)
+            self.gui_frame = tk.Frame(self.notebook)
+            self.gui_frame.pack()
+
+            # Create original equipment tab
+            self.equipment_frame = tk.Frame(self.gui_frame)
+            self.equipment_frame.pack()
+        else:
+            self.gui_frame = tk.Frame(self.interior)
+            self.equipment_frame = tk.Frame(self.gui_frame)
         enter_button = tk.Button(self.equipment_frame, text="Assign and Read Data", command=self.open_assign)
         enter_button.pack(anchor="nw", padx=15, pady=15)
 
@@ -204,7 +267,7 @@ class System2:
         self.pump_connect_vars = [False] * len(self.pumps_list)
         self.pump_port_vars = [None] * len(self.pumps_list)
         self.pump_objects = {}
-        self.pump_controls = {} 
+        self.pump_controls = {}
         self.pump_plot_on = False
         self.create_pump_ui()
 
@@ -216,7 +279,14 @@ class System2:
         for i,crystallizer in enumerate(addresses['Crystallizers'].keys()):
             address_list = list(addresses['Crystallizers'][crystallizer])
             Crystallizer = CrystallizerGUI(self,address_list,i+1)
-            Crystallizer.create_crystallizer_ui()
+            # Crystallizer.create_crystallizer_ui()
+            # Create a button in the root to open the popup
+            if self.different_tabs:
+                Crystallizer.create_crystallizer_ui()
+            else:
+                btn = tk.Button(self.equipment_frame, text=f"Open Crystallizer {i + 1}", command=Crystallizer.open_popup)
+                btn.pack(anchor="w", padx=10, pady=5)
+
             self.current_row+=1
 
 
@@ -232,6 +302,7 @@ class System2:
         self.register_dictionary = {}
 
         self.create_temperatures_section()
+        self.create_peltiers_section()
         self.create_pressure_transmitter_section()
         self.create_balance_section()
         self.create_pressure_regulator_section()
@@ -240,21 +311,25 @@ class System2:
         self.create_stirrer_section()
         self.create_drum_section()
 
-        self.equipment_frame.grid(row=0, column=0, sticky="nw")
+        if self.different_tabs:
+            self.notebook.add(self.gui_frame, text="Equipment Control")
+        else:
+            self.equipment_frame.grid(row=0, column=0, sticky="nw")
 
         # Initiate Classes
         plc_host_num = "169.254.83.200"
         self.temperature_plc = ReadFloatsPLC(plc_host_num, 502)
         self.pressure_transmitter_plc = ReadFloatsPLC(plc_host_num, 502)
         self.balance_com = Balance()
+        self.peltier_com = Peltier()
         self.pressure_inout_plc = OneBitClass(plc_host_num)
         self.valve_plc = OneBitClass(plc_host_num)
         self.drum_plc = OneBitClass(plc_host_num)
 
         self.stirrer_plc = WriteFloatsPLC(plc_host_num)
         self.pressure_regulator_plc = WriteFloatsPLC(plc_host_num)
-
-        gui_frame.pack()
+        if not self.different_tabs:
+            self.gui_frame.pack()
 
         # Setup for graphs
         self.setup_graphs(right_panel)
@@ -279,7 +354,7 @@ class System2:
 
         # Time window control
         tk.Label(control_buttons_frame, text="Time Window:").grid(row=0, column=0, padx=5)
-        self.time_window_var = tk.StringVar(value="120")
+        self.time_window_var = tk.StringVar(value="3000")
         time_window_entry = tk.Entry(control_buttons_frame, textvariable=self.time_window_var, width=6)
         time_window_entry.grid(row=0, column=1, padx=5)
         tk.Label(control_buttons_frame, text="seconds").grid(row=0, column=2, padx=5)
@@ -366,7 +441,7 @@ class System2:
             self.pressures_dict,
             self.balances_dict,
             self.flow_rates_dict,
-            max_points=1000,  # Store up to 1000 data points per series
+            max_points=6000,  # Store up to 1000 data points per series
             update_interval=0.5  # Update every 0.5 seconds
         )
 
@@ -605,10 +680,44 @@ class System2:
         if tk.messagebox.askyesno("Clear Data", "Are you sure you want to clear all graph data?"):
             self.graph.clear_data()
     # crystalizer
-    def crystallizer_run(self,address_list, steps):
+    def crystallizer_run(self,address_list, steps, init_temp, rest_temp, repeat_count):
         print('Crystallizer run')
         print(f'Address list: {address_list}')
         print(f'Steps: {steps}')
+
+        def parse_duration(duration_str):
+            """Converts hh:mm:ss string into total seconds"""
+            h, m, s = map(int, duration_str.split(":"))
+            return h * 3600 + m * 60 + s
+
+        def generate_peltier_sequence(steps):
+            """
+            Returns a list of actions like:
+            [{'mode': 'ramp', 'target': 45.0, 'rate': 0.5}, {'mode': 'soak', 'duration': 7200}]
+            """
+            print(steps)
+            sequence = []
+            if not steps:
+                return sequence
+
+            current_temp = init_temp
+            for i in range(len(steps)):
+                prev_temp = current_temp
+                current_temp = steps[i]['temperature']
+
+                #GET RAMP TIME
+                rate = steps[i]['rate']
+                ramp_time = int(round(60*abs(current_temp - prev_temp)/rate))
+
+                #GET SOAK TIME
+                duration = steps[i].get('duration', None)
+                soak_time = parse_duration(duration)
+                sequence.append({'temp':current_temp, 'ramp_time': ramp_time, 'soak_time': soak_time})
+            return sequence
+        peltier_address = address_list[1]
+        sequence = generate_peltier_sequence(steps)
+        self.peltier_com.send_peltier_sequence(peltier_address, sequence,init_temp,repeat_count, rest_temp)
+
     # pumps
     def start_flow_polling(self, channel_name, pump_ser, channel):
         if channel_name in self.pump_polling_threads:
@@ -875,10 +984,9 @@ class System2:
                 self.register_dictionary[title][name] = tk.IntVar(value=address)
 
         frame.pack(anchor="nw", padx=15)
-    def create_peltier_section(self):
-        self.peltier_list = [f"Peltier {i+1}" for i in range(len(addresses['Peltiers']))]
-        self.create_equipment_section("Crystalizer 1", self.temperatures_list, self.temperature_connect,
-                                      display_current=True)
+    def create_peltiers_section(self):
+        self.peltiers_list = [f"Peltier {i+1}" for i in range(len(addresses['Peltiers']))]
+        self.create_equipment_section("Peltiers", self.peltiers_list, self.peltier_connect, entry=True)
 
     def create_temperatures_section(self):
         self.temperatures_list = ["Temperature 1", "Temperature 2", "Temperature 3"]
@@ -948,10 +1056,21 @@ class System2:
             balance.reading_onoff(True)
             self.read_balance_float_values(balance, data_type)
 
+    def toggle_peltier_connection(self, device_name, peltier):
+        """
+        Method to handle connection to balance.
+        Needs to be different from other methods since it requires a COM connection instead of plc
+        """
+        connect_peltier = self.connect_dictionary["peltiers"][device_name]
+        connect_peltier.config(state="disabled", relief="sunken", bg="#a9a9a9")
+        peltier.connect()
+
 
     def temperature_connect(self):
         self.toggle_connection("Temperatures", self.temperature_plc, read_float=True,
                                plc_object=self.temperature_plc, data_type="Temperatures")
+    def peltier_connect(self):
+        self.toggle_peltier_connection("Peltiers", self.peltier_com)
 
     def pressure_transmitter_connect(self):
         self.toggle_connection("Pressure Transmitters", self.pressure_transmitter_plc,
@@ -1205,12 +1324,15 @@ class System2:
         equipment type will be "Pressure Regulators" or "Stirrers"
         """
         if equipment_type == "Pressure Regulators":
-            plc_object = self.pressure_regulator_plc
+            object = self.pressure_regulator_plc
         elif equipment_type == "Stirrers":
-            plc_object = self.stirrer_plc
+            object = self.stirrer_plc
+        elif equipment_type == "Peltiers":
+            object = self.peltier_com
 
         reg1 = self.register_dictionary[equipment_type][equipment_name].get()
-        plc_object.write_float(reg1, value)
+        print('reg1', reg1)
+        object.write_float(reg1, value)
 
     def toggle_onoff(self, equipment_type, equipment_name, boolean, on_btn, off_btn):
         """
