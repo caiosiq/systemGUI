@@ -121,6 +121,7 @@ class Pump:
     BAUD = 9600
 
     def __init__(self, port_number: int):
+
         self.lock = threading.Lock()
         self.com = f"COM{port_number}"
         self.sp = serial.Serial(self.com,

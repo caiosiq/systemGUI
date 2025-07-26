@@ -100,7 +100,7 @@ class CrystallizerGUI:
             "Step",
             "Temperature\n(°C)",
             "Cooling/\nHeating Rate\n(°C/min)",
-            "Duration\n(hh:mm:ss)",
+            "Soak Time\n(hh:mm:ss)",
             "Flow Rate 1\n(mL/min)",
             "Flow Rate 2\n(mL/min)",
             "Flow Rate 3\n(mL/min)",
@@ -137,7 +137,7 @@ class CrystallizerGUI:
             try:
                 step_data["temperature"] = float(row_entries[1].get())
                 step_data["rate"] = float(row_entries[2].get())
-                step_data["duration"] = str(row_entries[3].get())  # Keep as string, parse later
+                step_data["soak_time"] = str(row_entries[3].get())  # Keep as string, parse later
                 for i, key in enumerate(["flow1", "flow2", "flow3", "flow4"], start=4):
                     val = row_entries[i].get()
                     step_data[key] = float(val) if val.strip() != "" else None
@@ -169,7 +169,7 @@ addresses = {
     # 'Balances': {
     #     'Pump 1': [12, 6, 7, 8],
     # },
-    'Crystallizers':{'Crystallizer 1':(9,11)}, #First element is the Pump COM, second is the Peltier COM
+    'Crystallizers':{'Crystallizer 1':(0,0)}, #First element is the Pump Index, second is the Peltier Index (which of the pumps and peltiers are the ones used here, starts from 0)
     'Pumps': [9],
     'Peltiers': [11,20],
     # 'Balances':[12,5,6,7],
@@ -680,9 +680,9 @@ class System2:
         if tk.messagebox.askyesno("Clear Data", "Are you sure you want to clear all graph data?"):
             self.graph.clear_data()
     # crystalizer
-    def crystallizer_run(self,address_list, steps, init_temp, rest_temp, repeat_count):
+    def crystallizer_run(self,index_list, steps, init_temp, rest_temp, repeat_count):
         print('Crystallizer run')
-        print(f'Address list: {address_list}')
+        print(f'Index list: {index_list}')
         print(f'Steps: {steps}')
 
         def parse_duration(duration_str):
@@ -690,6 +690,32 @@ class System2:
             h, m, s = map(int, duration_str.split(":"))
             return h * 3600 + m * 60 + s
 
+        def generate_pump_sequence(steps):
+            """
+            Returns a list of actions like:
+            [{'duration':50, 'flow1': 0.5, 'flow2': 0.5, 'flow3': 0.5, 'flow4': 0.5}, {'duration':70, 'flow1': 0.5, 'flow2': 0.5, 'flow3': 0.5, 'flow4': 0.5}]
+            """
+            print(steps)
+            sequence = []
+            if not steps:
+                return sequence
+
+            current_temp = init_temp
+            for i in range(len(steps)):
+                prev_temp = current_temp
+                current_temp = steps[i]['temperature']
+
+                # GET RAMP TIME
+                rate = steps[i]['rate']
+                ramp_time = int(round(60 * abs(current_temp - prev_temp) / rate))
+
+                # GET SOAK TIME
+                soak_time = steps[i].get('soak_time', None)
+                soak_time = parse_duration(soak_time)
+
+                total_duration = soak_time + ramp_time
+                sequence.append({'duration': total_duration, 'flow1': steps[i]['flow1'], 'flow2': steps[i]['flow2'], 'flow3': steps[i]['flow3'], 'flow4': steps[i]['flow4']})
+            return sequence
         def generate_peltier_sequence(steps):
             """
             Returns a list of actions like:
@@ -710,13 +736,25 @@ class System2:
                 ramp_time = int(round(60*abs(current_temp - prev_temp)/rate))
 
                 #GET SOAK TIME
-                duration = steps[i].get('duration', None)
-                soak_time = parse_duration(duration)
+                soak_time = steps[i].get('soak_time', None)
+                soak_time = parse_duration(soak_time)
                 sequence.append({'temp':current_temp, 'ramp_time': ramp_time, 'soak_time': soak_time})
             return sequence
-        peltier_address = address_list[1]
-        sequence = generate_peltier_sequence(steps)
-        self.peltier_com.send_peltier_sequence(peltier_address, sequence,init_temp,repeat_count, rest_temp)
+        pump_index =  index_list[0]
+        peltier_index = index_list[1]
+
+        pump_sequence = generate_pump_sequence(steps)
+        peltier_sequence = generate_peltier_sequence(steps)
+
+        peltier_address = addresses['Peltiers'][peltier_index]
+        self.peltier_com.send_peltier_sequence(peltier_address, peltier_sequence, init_temp, repeat_count, rest_temp)
+
+        print('setting the following sequence on pump:', pump_sequence)
+        self.pump_connect(pump_index)
+        self.pump_set_sequence(pump_index,pump_sequence)
+
+
+
 
     # pumps
     def start_flow_polling(self, channel_name, pump_ser, channel):
@@ -810,6 +848,8 @@ class System2:
         if not self.pump_port_vars[pump_index]:
             address = addresses["Pumps"][pump_index]
             self.pump_port_vars[pump_index] = tk.IntVar(value=address)
+        else:
+            return None
 
         try:
             # Get the port number from the pump port variable
@@ -896,21 +936,22 @@ class System2:
         except Exception as e:
             print(f"Error turning off pump channel: {e}")
 
-    def pump_set_flow_rate(self, pump_index, channel, flow_var):
+    def pump_set_flow_rate(self, pump_index, channel, flow_var=None,flow_rate=None):
         if not self.pump_connect_vars[pump_index]:
             return
-        pump_control = self.pump_objects[pump_index]
-        flow_rate = float(flow_var.get())
-        pump_control.serial_obj.set_speed(channel, flow_rate)
-
-        channel_name = f"{self.pumps_list[pump_index]}_Ch{channel}"
-
-        # Start polling pump output
-        self.start_flow_polling(channel_name, pump_control.serial_obj, channel)
+        # pump_control = self.pump_objects[pump_index]
+        # flow_rate = float(flow_var.get())
+        # pump_control.serial_obj.set_speed(channel, flow_rate)
+        #
+        # channel_name = f"{self.pumps_list[pump_index]}_Ch{channel}"
+        #
+        # # Start polling pump output
+        # self.start_flow_polling(channel_name, pump_control.serial_obj, channel)
 
         try:
             pump_control = self.pump_objects[pump_index]
-            flow_rate = float(flow_var.get())
+            if flow_rate is None:
+                flow_rate = float(flow_var.get())
             pump_control.serial_obj.set_speed(channel, flow_rate)
 
             channel_name = f"{self.pumps_list[pump_index]}_Ch{channel}"
@@ -924,6 +965,29 @@ class System2:
         except Exception as e:
             print(f"Error setting flow rate: {e}")
 
+    def pump_set_sequence(self, pump_index, sequence):
+        def run_sequence():
+            if not self.pump_connect_vars[pump_index]:
+                print("Pump is not connected")
+                return
+
+            pump_control = self.pump_objects[pump_index]
+
+            for step in sequence:
+                try:
+                    for ch in range(1, 5):  # channels 1–4
+                        flow_key = f"flow{ch}"
+                        flow_rate = step.get(flow_key, 0.0)
+                        self.pump_set_flow_rate(pump_index, ch, flow_rate=flow_rate)
+
+                    print(f"Set flow for pump {pump_index}, waiting {step['duration']}s")
+                    time.sleep(step['duration'])
+
+                except Exception as e:
+                    print(f"Error in sequence step: {e}, 'step': {step},'sequence': {sequence}")
+                    break
+
+        threading.Thread(target=run_sequence, daemon=True).start()
     def update_flow_rate_graph(self, channel_name, flow_rate):
         while self.pump_plot_on:
             # Update the flow rate in the graph
