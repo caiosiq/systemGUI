@@ -490,7 +490,7 @@ class DataCollector:
             value: Current sensor reading
         """
         with self.buffer_lock:
-            if data_type == "temperatures":
+            if data_type == "temperatures" or data_type == "peltiers temperature":
                 self.temperature_buffer[name] = value
             elif data_type == "pressures":
                 self.pressure_buffer[name] = value
@@ -498,6 +498,8 @@ class DataCollector:
                 self.flow_rate_buffer[name] = value
             elif data_type == "balances":
                 self.balance_buffer[name] = value
+            else:
+                raise ValueError(f"Invalid data type: {data_type}")
     
     def start_collection(self):
         """Start the synchronized data collection thread."""

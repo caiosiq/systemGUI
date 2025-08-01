@@ -205,16 +205,33 @@ class Pump:
         sign = "+" if exp >= 0 else "-"
         return f"{mant_int:04d}{sign}{abs(exp)}"
 
+    # def set_speed(self, ch: int, flow_mL_min: float):
+    #     self._check_ack(self._write(f"{ch}M\r"), f"{ch}M")
+    #     flow_str = self._format_flow_string(flow_mL_min)
+    #     echo = self._write(f"{ch}f{flow_str}\r").strip()
+    #     print(f"[DEBUG] Sent flow string: {flow_str}, Echo: {echo!r}")
+    #     if not (echo.startswith(str(int(flow_mL_min * 1000))) or echo.startswith(flow_str[:4])):
+    #         raise RuntimeError(f"Pump did not echo flow correctly ({echo!r}), tried to send {f"{ch}f{flow_str}\r"}")
+    #     ack = self._write(f"{ch}H\r")
+    #     print(f"[DEBUG] Start pump ack: {ack!r}")
+    #     self._check_ack(ack, f"{ch}H")
     def set_speed(self, ch: int, flow_mL_min: float):
         self._check_ack(self._write(f"{ch}M\r"), f"{ch}M")
         flow_str = self._format_flow_string(flow_mL_min)
         echo = self._write(f"{ch}f{flow_str}\r").strip()
         print(f"[DEBUG] Sent flow string: {flow_str}, Echo: {echo!r}")
         if not (echo.startswith(str(int(flow_mL_min * 1000))) or echo.startswith(flow_str[:4])):
-            raise RuntimeError(f"Pump did not echo flow correctly ({echo!r}), tried to send {f"{ch}f{flow_str}\r"}")
+            raise RuntimeError(f"Pump did not echo flow correctly ({echo!r}), tried to send {f'{ch}f{flow_str}\\r'}")
+
+        # Optional: check if the channel is running, or skip this if already running
         ack = self._write(f"{ch}H\r")
         print(f"[DEBUG] Start pump ack: {ack!r}")
-        self._check_ack(ack, f"{ch}H")
+        if ack.strip() == "#":
+            print(f"[WARN] Pump might already be running on channel {ch}, ignoring error.")
+        else:
+            self._check_ack(ack, f"{ch}H")
+
+        sleep(0.5)
 
     def get_speed(self, ch: int) -> float:
         """
@@ -253,16 +270,62 @@ class Pump:
 class Peltier:
     def __init__(self):
         self.locations={}
-
+        self.devices={}
+        self.reading={}
     def write_float(self, reg1, value):
         print(f"Writing value: {value} to registers {reg1}")
-        my_device = Py_TC720.TC720(f'COM{reg1}')
-        my_device.set_mode(0)
-        my_device.set_temp(value)
+        if self.devices.get(reg1):
+            device = self.devices[reg1]
+        else:
+            device = Py_TC720.TC720(f'COM{reg1}')
+            self.devices[reg1] = device
+        device.set_mode(0)
+        device.set_temp(value)
+    def reading_onoff(self,address):
+        if self.devices.get(address):
+            self.reading[address] = True
+        else:
+            self.devices[address] = Py_TC720.TC720(f'COM{address}')
+            self.reading[address] = True
+    def read_float(self, label_or_callback, numbercom):
+        """
+        Inputs in two registers. The second register is optional.
+
+        If two registers are entered, the data is a 32-bit data, else
+        one register means 16-bit.
+
+        The label_or_callback parameter can be either:
+        1. A tk.Label to update directly (for backward compatibility)
+        2. A callback function that receives the value (preferred for graph integration)
+        """
+        print(f'COM of {numbercom}')
+        device = self.devices[numbercom]
+        while self.reading:
+            try:
+                # Round the value to 3 decimal places
+                current_value = device.get_temp1()
+
+                # Update the label or call the callback
+                if callable(label_or_callback):
+                    # It's a callback function
+                    label_or_callback(current_value)
+                else:
+                    # It's a label widget (for backward compatibility)
+                    label_or_callback.config(text=str(current_value))
+
+            except Exception as e:
+                print(f"Error reading float: {e}")
+
+            sleep(0.5)
 
     def send_peltier_sequence(self, reg1, sequence,init_temp,repeat_count, rest_temp):
-        device = Py_TC720.TC720(f'COM{reg1}',mode=1)
+        if self.devices.get(reg1):
+            device = self.devices[reg1]
+        else:
+            device = Py_TC720.TC720(f'COM{reg1}',mode=1)
+            self.devices[reg1] = device
         print(f"Sending sequence {sequence} to COM{reg1}")
+        device.set_mode(1)
         current_temp = device.get_temp1()
         device.set_single_sequence(1, temp=init_temp, ramp_time=int(abs(init_temp-current_temp)*30),
                                    soak_time=int(abs(init_temp-current_temp)*5), go_to=2, repeats = 0)

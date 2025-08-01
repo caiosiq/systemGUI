@@ -37,6 +37,17 @@ class CrystallizerGUI:
         self.entries = []
         self.repeat_entry = None
         self.rest_temp_entry = None
+    def add_btn(self,btn):
+        self.btn = btn
+
+    def _on_close(self):
+        # Re-enable the button and restore its appearance
+        if hasattr(self, "btn") and self.btn:
+            self.btn.config(state="normal", relief="raised", bg="SystemButtonFace")
+
+        # Properly destroy the popup
+        if hasattr(self, "popup"):
+            self.popup.destroy()
     def render_rows(self):
         for row in range(self.step_count):
             row_entries = []
@@ -66,14 +77,39 @@ class CrystallizerGUI:
         self.entries.append(row_entries)
         self.step_count += 1
         self.render_functionalities()
+
+    def remove_row(self):
+        if self.step_count <= 2:
+            return  # Do not allow fewer than 2 steps
+
+        # Remove last entry widgets from GUI
+        last_row_entries = self.entries.pop()
+        for widget in last_row_entries:
+            widget.destroy()
+
+        self.step_count -= 1
+        self.render_functionalities()  # Update UI
     def open_popup(self):
         self.create_crystallizer_ui()
+        self.btn.config(state="disabled", relief="sunken", bg="#a9a9a9")
+
     def render_functionalities(self):
-        self.add_button.grid(row=self.step_count + 3, column=len(self.headers) - 1, sticky="e")
+
+        self.button_frame.grid(row=self.step_count + 3, column=len(self.headers) - 2, columnspan=2, sticky="e",
+                               pady=(5, 5))
+        self.add_button.pack(side="left", padx=(0, 2))
+        self.remove_button.pack(side="left")
+
+        # Enable remove button only if more than 2 steps
+        if self.step_count > 2:
+            self.remove_button.config(state="normal", relief="raised", bg="#f0f0f0")
+        else:
+            self.remove_button.config(state="disabled", relief="sunken", bg="#dcdcdc")
+
         self.repeat_label.grid(row=self.step_count + 4, column=0, sticky="w", pady=(10, 0))
         self.repeat_entry.grid(row=self.step_count + 4, column=1, sticky="w", pady=(10, 0))
         self.rest_label.grid(row=self.step_count + 5, column=0, sticky="w", pady=(10, 0))
-        self.rest_temp_entry.grid(row=self.step_count +5 , column=1, sticky="w", pady=(10, 0))
+        self.rest_temp_entry.grid(row=self.step_count + 5, column=1, sticky="w", pady=(10, 0))
         self.run_button.grid(row=self.step_count + 6, column=0, columnspan=len(self.headers), pady=10)
     def create_crystallizer_ui(self):
         row = self.row
@@ -88,6 +124,10 @@ class CrystallizerGUI:
             popup.title(f"Crystallizer {self.name}")
             self.frame = tk.Frame(popup)
             self.frame.pack(anchor="nw", padx=15, pady=15)
+            # Store the popup as an instance attribute so it can be accessed later
+            self.popup = popup
+            # Handle window close event
+            self.popup.protocol("WM_DELETE_WINDOW", self._on_close)
 
         tk.Label(self.frame, text=f"Crystallizer {name}", font=("Arial", 18, "underline")).grid(sticky="w", row=0,
                                                                                              column=0)
@@ -113,7 +153,16 @@ class CrystallizerGUI:
 
         self.render_rows()
         # Add button
-        self.add_button = tk.Button(self.frame, text="+", command=self.add_row, font=("Arial", 14, "bold"))
+        # Place + and - buttons side by side
+        # Frame to hold + and - buttons
+        self.button_frame = tk.Frame(self.frame)
+        self.add_button = tk.Button(self.button_frame, text="+", command=self.add_row,
+                                    font=("Arial", 14, "bold"), width=4)
+
+        self.remove_button = tk.Button(self.button_frame, text="-", command=self.remove_row,
+                                       font=("Arial", 14, "bold"), width=4,
+                                       disabledforeground="gray", bg="#f0f0f0")
+
         # Repeat steps section
         self.repeat_label = tk.Label(self.frame, text="Repeat steps", font=("Arial", 10))
         self.repeat_entry = tk.Entry(self.frame, width=10)
@@ -169,11 +218,11 @@ addresses = {
     # 'Balances': {
     #     'Pump 1': [12, 6, 7, 8],
     # },
-    'Crystallizers':{'Crystallizer 1':(0,0)}, #First element is the Pump Index, second is the Peltier Index (which of the pumps and peltiers are the ones used here, starts from 0)
+    'Crystallizers':{'Crystallizer 1':(0,0),'Crystallizer 2':(1,1) }, #First element is the Pump Index, second is the Peltier Index (which of the pumps and peltiers are the ones used here, starts from 0)
     'Pumps': [9],
-    'Peltiers': [11,20],
+    'Peltiers': [11],
     # 'Balances':[12,5,6,7],
-    'Balances':[12],
+    'Balances':[12, 13],
     'Temperatures': [28710, 28712, 28714],
     'Pressure Transmitters': [28750, 28752, 28754],
     'Pressure Regulators': [28770, 28772],
@@ -276,19 +325,21 @@ class System2:
         self.current_row+=1
         ### --- Crystallize Control --- ###
         self.crystallizer_list = [f"Crystallizer {i+1}" for i in range(len(addresses['Crystallizers']))]
-        for i,crystallizer in enumerate(addresses['Crystallizers'].keys()):
+        # Create a single section for all crystallizer buttons
+        crystallizer_section = tk.LabelFrame(self.equipment_frame, text="Crystallizers", font=("Arial", 16, "underline"))
+        crystallizer_section.pack(anchor="w", padx=10, pady=10)
+
+        for i, crystallizer in enumerate(addresses['Crystallizers'].keys()):
             address_list = list(addresses['Crystallizers'][crystallizer])
-            Crystallizer = CrystallizerGUI(self,address_list,i+1)
-            # Crystallizer.create_crystallizer_ui()
-            # Create a button in the root to open the popup
+            Crystallizer = CrystallizerGUI(self, address_list, i + 1)
+
             if self.different_tabs:
                 Crystallizer.create_crystallizer_ui()
             else:
-                btn = tk.Button(self.equipment_frame, text=f"Open Crystallizer {i + 1}", command=Crystallizer.open_popup)
-                btn.pack(anchor="w", padx=10, pady=5)
-
-            self.current_row+=1
-
+                btn = tk.Button(crystallizer_section, text=f"Open Crystallizer {i + 1}",
+                                command=Crystallizer.open_popup, width=20)
+                btn.pack(anchor="w", padx=10, pady=2)
+                Crystallizer.add_btn(btn)
 
         # Maps equipment type to a dictionary that maps a specific equipment to either the current_label
         # for temp and pressure transmitters, or the current value variable for pressure regulator and stirrer
@@ -997,23 +1048,35 @@ class System2:
 
     # other
     def create_equipment_section(self, title, items, connect_command, display_current=False, entry=False,
-                                 onoff_buttons=False):
+                                 onoff_buttons=False, peltier=False):
         start = self.current_row
         frame = tk.Frame(self.equipment_frame)
         tk.Label(self.equipment_frame, text=title, font=("Arial", 16, "underline")).pack(anchor="nw", padx=15,
                                                                                          pady=(10, 0))
         if display_current or entry:
             self.equipment_data[title] = {}
+            if peltier:
+                self.equipment_data['Peltiers Temperature'] = {}
+
         self.register_dictionary[title] = {}
+        if peltier:
+            self.register_dictionary['Peltiers Temperature'] = {}
 
         for i, name in enumerate(items):
+
             tk.Label(frame, text=name).grid(row=i + start, column=0, sticky="w", pady=5)
             if display_current:  # Temperatures and pressure trasmitters // read float class
                 current_label = tk.Label(frame, text='', bg="white", borderwidth=1, relief="raised", width=10)
                 current_label.grid(row=i + start, column=1, padx=15)
-                self.equipment_data[title][name] = current_label
-                address = addresses[title][i]
-                self.register_dictionary[title][name] = tk.IntVar(value=address)
+
+                if title == 'Temperatures' and peltier and i >= len(addresses['Temperatures']):
+                    self.equipment_data['Peltiers Temperature'][name] = current_label
+                    address = addresses['Peltiers'][i-len(addresses['Temperatures'])]
+                    self.register_dictionary['Peltiers Temperature'][name] = tk.IntVar(value=address)
+                else:
+                    self.equipment_data[title][name] = current_label
+                    address = addresses[title][i]
+                    self.register_dictionary[title][name] = tk.IntVar(value=address)
 
                 # connnect button for these two equipments
                 connect_button = tk.Button(frame, text="Connect", font=("Arial", 12, "bold"), width=12,
@@ -1052,10 +1115,11 @@ class System2:
         self.peltiers_list = [f"Peltier {i+1}" for i in range(len(addresses['Peltiers']))]
         self.create_equipment_section("Peltiers", self.peltiers_list, self.peltier_connect, entry=True)
 
+
     def create_temperatures_section(self):
-        self.temperatures_list = ["Temperature 1", "Temperature 2", "Temperature 3"]
+        self.temperatures_list = [f"Reactant Temperature {i+1}" for i in range(len(addresses['Temperatures']))] + [f'Peltier Temperature {i+1}' for i in range(len(addresses['Peltiers']))]
         self.create_equipment_section("Temperatures", self.temperatures_list, self.temperature_connect,
-                                      display_current=True)
+                                      display_current=True, peltier= True)
 
     def create_pressure_transmitter_section(self):
         self.pressure_transmitters_list = ["Pressure Transmitter 1", "Pressure Transmitter 2", "Pressure Transmitter 3"]
@@ -1090,7 +1154,7 @@ class System2:
         self.drums_list = ["Pressure Driven 1"]
         self.create_equipment_section("Continuous Operation - Pressure Driven", self.drums_list, self.drum_connect, onoff_buttons=True)
 
-    def toggle_connection(self, device_name, plc, read_float=False, plc_object=None, data_type=None):
+    def toggle_connection(self, device_name, plc, read_float=False, plc_object=None, data_type=None, peltier_object=None):
         """
         Generic method to handle connection toggling for various devices.
         :param device_name: String name of the device for debugging purposes.
@@ -1102,10 +1166,18 @@ class System2:
         """
         connect_button = self.connect_dictionary["buttons"][device_name]
         connect_button.config(state="disabled", relief="sunken", bg="#a9a9a9")
+        peltier=False
+        if peltier_object:
+            peltier=True
+            for address in addresses['Peltiers']:
+                peltier_object.reading_onoff(address)
+                self.read_peltier_float_values(peltier_object, 'Peltiers Temperature', address)
+
         plc.connect()
         if read_float:
             plc.reading_onoff(True)
-            self.read_float_values(plc_object, data_type)
+            self.read_float_values(plc_object, data_type,peltier=peltier)
+
 
     def toggle_balance_connection(self, device_name, balance, read_float=False, data_type=None):
         """
@@ -1132,7 +1204,7 @@ class System2:
 
     def temperature_connect(self):
         self.toggle_connection("Temperatures", self.temperature_plc, read_float=True,
-                               plc_object=self.temperature_plc, data_type="Temperatures")
+                               plc_object=self.temperature_plc, data_type="Temperatures",peltier_object = self.peltier_com)
     def peltier_connect(self):
         self.toggle_peltier_connection("Peltiers", self.peltier_com)
 
@@ -1319,7 +1391,7 @@ class System2:
         self.data_collector = DataCollector(self.graph)
         self.data_collector.start_collection()
 
-    def read_float_values(self, plc_object, data_type):
+    def read_float_values(self, plc_object, data_type,peltier=False):
         """
         For PLC equipment that reads float values with synchronized data collection
         data_type is the type of equipment (i.e. Temperatures or Pressure Transmitters)
@@ -1327,6 +1399,9 @@ class System2:
         print(f"[read_float_values] Starting for type: {data_type}")
         print(f"Connecting on {data_type}, equipment_data = {self.equipment_data}")
         for equipment_name in self.equipment_data[data_type]:
+            if peltier:
+                if 'peltier' in equipment_name:
+                    continue
             label = self.equipment_data[data_type][equipment_name]
             reg1 = self.register_dictionary[data_type][equipment_name].get()
             print(f"[read_float_values] Reading {equipment_name} at reg {reg1}")
@@ -1382,6 +1457,39 @@ class System2:
             t.daemon = True
             t.start()
 
+    def read_peltier_float_values(self,peltier_object, data_type, address):
+        """
+                For PLC equipment that reads float values with synchronized data collection
+                data_type is the type of equipment (i.e. Temperatures or Pressure Transmitters)
+                """
+        print(f"[read_float_balance_values] Starting for type: {data_type}")
+        for equipment_name in self.equipment_data[data_type]:  # FOR EACH BALANCE COM
+            label = self.equipment_data[data_type][equipment_name]
+            COM = self.register_dictionary[data_type][equipment_name].get()
+            print(f"[read_float_values] Reading {equipment_name} at reg {COM}")
+
+            # Create a custom function to update the buffer and the label
+            def update_value_and_buffer(label, equipment_name, data_type):
+                def _update(value):
+                    # Update the label
+                    label.config(text=str(value))
+
+                    # Update the data collector buffer instead of directly updating the graph
+                    data_type_lower = data_type.lower()
+                    if data_type_lower == "pressure transmitters":
+                        data_type_lower = "pressures"  # dictionary name is pressures_dict
+                    self.data_collector.buffer_update(data_type_lower, equipment_name, value)
+                    # print(f"[callback] {equipment_name}: Value received = {value}")
+
+                return _update
+
+            print(f'Creating Callback for equiptment {equipment_name}')
+            callback = update_value_and_buffer(label, equipment_name, data_type)
+
+            # Start the reading thread
+            t = threading.Thread(target=lambda: peltier_object.read_float(callback, COM))
+            t.daemon = True
+            t.start()
     def write_float_values(self, equipment_type, equipment_name, value):
         """
         Function to write float values to PLC.
@@ -1432,6 +1540,17 @@ class System2:
 
         if hasattr(self, 'graph'):
             self.graph.stop_plotting(True)
+        for pump_index in range(len(self.pump_objects)):
+            if self.pump_connect_vars[pump_index]:
+                try:
+                    pump_control = self.pump_objects[pump_index]
+                    if hasattr(pump_control, "serial_obj") and pump_control.serial_obj:
+                        pump_control.serial_obj.close()
+                        print(f"Closed pump {pump_index}")
+                except Exception as e:
+                    print(f"Error closing pump {pump_index}: {e}")
+
+
 
         time.sleep(0.2)
 
