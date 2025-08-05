@@ -383,6 +383,23 @@ class Balance:
                     if line:
                         lines.append(line)
                 # print(f'Found the following output from the lines:{lines}')
+                if len(lines)==1:
+                    line = lines[0].strip()
+                    # print('line:',line)
+                    # Check if the line ends with 'g' (grams)
+                    if line.endswith('g'):
+                        line = line[:-1].strip()  # Remove the 'g' and surrounding spaces
+                        fac = 1
+                    if line.endswith('mg'):
+                        line = line[:-2].strip()  # Remove the 'mg' and surrounding spaces
+                        fac = 1000
+
+                    # Now line should be something like '+  6.4456'
+                    # Remove the '+' sign and extra spaces
+                    line = line.replace('+', '').strip()
+
+                    # Convert to float
+                    mass_in_float  = float(line)*fac
                 for l in lines:
                     if re.search(r'\d+\s+mg', l):  # Look for something like "7710    mg"
                         number_str = re.search(r'(\d+)\s+mg', l).group(1)

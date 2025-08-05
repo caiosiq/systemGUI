@@ -6,71 +6,12 @@ from ast import Index
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from .System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC, Balance, Peltier
-from .System2_utils import Graph, DataCollector
+from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC, Balance, Peltier
+from System2_utils import Graph, DataCollector
 import serial
 import time
 import sys
-import os
-import sys
 
-# Set current working directory to script directory
-if getattr(sys, 'frozen', False):
-    # If the app is frozen by PyInstaller
-    os.chdir(sys._MEIPASS)
-else:
-    # If running as script
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-# Modern color palette
-COLORS = {
-    'primary': '#2563eb',      # Blue
-    'primary_hover': '#1d4ed8', # Darker blue
-    'secondary': '#64748b',    # Slate gray
-    'background': '#f8fafc',   # Light gray
-    'surface': '#ffffff',      # White
-    'border': '#e2e8f0',      # Light border
-    'text': '#1e293b',        # Dark text
-    'text_secondary': '#64748b', # Secondary text
-    'success': '#10b981',      # Green
-    'warning': '#f59e0b',      # Orange
-    'error': '#ef4444',        # Red
-    'disabled': '#94a3b8'      # Disabled gray
-}
-
-# COLORS = {
-#     'primary': '#60a5fa',      # Azul claro (para botões, destaques)
-#     'primary_hover': '#3b82f6', # Azul um pouco mais escuro
-#     'secondary': '#4b5563',    # Cinza escuro (para elementos secundários)
-#     'background': '#1f2937',   # Fundo principal muito escuro
-#     'surface': '#374151',      # Superfícies de elementos (frames, entradas)
-#     'border': '#4b5563',      # Borda de elementos
-#     'text': '#f9fafb',        # Texto claro (quase branco)
-#     'text_secondary': '#9ca3af', # Texto secundário (cinza claro)
-#     'success': '#34d399',      # Verde (para sucesso)
-#     'warning': '#fbbf24',      # Laranja (para aviso)
-#     'error': '#f87171',        # Vermelho (para erro)
-#     'disabled': '#6b7280'      # Cinza para elementos desabilitados
-# }
-
-# Typography settings
-FONTS = {
-    'title': ('Segoe UI', 18, 'bold'),
-    'subtitle': ('Segoe UI', 14, 'bold'),
-    'heading': ('Segoe UI', 12, 'bold'),
-    'body': ('Segoe UI', 10),
-    'small': ('Segoe UI', 9),
-    'button': ('Segoe UI', 10, 'bold')
-}
-
-# Spacing system
-SPACING = {
-    'xs': 4,
-    'sm': 8,
-    'md': 12,
-    'lg': 16,
-    'xl': 20,
-    'xxl': 24
-}
 
 class PumpControl:
     """Encapsulates all UI elements for a pump."""
@@ -106,7 +47,7 @@ class CrystallizerGUI:
     def _on_close(self):
         # Re-enable the button and restore its appearance
         if hasattr(self, "btn") and self.btn:
-            self.btn.config(state="normal")
+            self.btn.config(state="normal", relief="raised", bg="SystemButtonFace")
 
         # Properly destroy the popup
         if hasattr(self, "popup"):
@@ -117,11 +58,11 @@ class CrystallizerGUI:
             row_entries = []
             for col in range(len(self.headers)):
                 if col == 0:
-                    lbl = ttk.Label(self.frame, text=str(row + 1), font=FONTS['body'])
+                    lbl = tk.Label(self.frame, text=str(row + 1), font=("Arial", 10))
                     lbl.grid(row=row + 3, column=col)
                     row_entries.append(lbl)
                 else:
-                    entry = ttk.Entry(self.frame, font=FONTS['body'])
+                    entry = tk.Entry(self.frame)
                     entry.grid(row=row + 3, column=col)
                     row_entries.append(entry)
             self.entries.append(row_entries)
@@ -131,11 +72,11 @@ class CrystallizerGUI:
         row_entries = []
         for col in range(len(self.headers)):
             if col == 0:
-                lbl = ttk.Label(self.frame, text=str(row + 1), font=FONTS['body'])
+                lbl = tk.Label(self.frame, text=str(row + 1), font=("Arial", 10))
                 lbl.grid(row=row + 3, column=col)
                 row_entries.append(lbl)
             else:
-                entry = ttk.Entry(self.frame, font=FONTS['body'])
+                entry = tk.Entry(self.frame)
                 entry.grid(row=row + 3, column=col)
                 row_entries.append(entry)
         self.entries.append(row_entries)
@@ -156,7 +97,7 @@ class CrystallizerGUI:
 
     def open_popup(self):
         self.create_crystallizer_ui()
-        self.btn.config(state="disabled")
+        self.btn.config(state="disabled", relief="sunken", bg="#a9a9a9")
 
     def render_functionalities(self):
 
@@ -167,9 +108,9 @@ class CrystallizerGUI:
 
         # Enable remove button only if more than 2 steps
         if self.step_count > 2:
-            self.remove_button.config(state="normal")
+            self.remove_button.config(state="normal", relief="raised", bg="#f0f0f0")
         else:
-            self.remove_button.config(state="disabled")
+            self.remove_button.config(state="disabled", relief="sunken", bg="#dcdcdc")
 
         self.repeat_label.grid(row=self.step_count + 4, column=0, sticky="w", pady=(10, 0))
         self.repeat_entry.grid(row=self.step_count + 4, column=1, sticky="w", pady=(10, 0))
@@ -182,18 +123,26 @@ class CrystallizerGUI:
         name = self.name
 
         if self.fullgui.different_tabs:
-            self.frame = ttk.Frame(self.fullgui.notebook)
+            self.frame = tk.Frame(self.fullgui.notebook)
             self.frame.pack(anchor="nw", padx=15, pady=15)
             self.fullgui.notebook.add(self.frame, text=f"Crystallizer {self.name}")
         else:
             popup = tk.Toplevel(self.root)
             popup.title(f"Crystallizer {self.name}")
-            self.frame = ttk.Frame(popup)
+            self.frame = tk.Frame(popup)
             self.frame.pack(anchor="nw", padx=15, pady=15)
             # Store the popup as an instance attribute so it can be accessed later
             self.popup = popup
             # Handle window close event
             self.popup.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        tk.Label(self.frame, text=f"Crystallizer {name}", font=("Arial", 18, "underline")).grid(sticky="w", row=0,
+                                                                                                column=0)
+        self.init_label = tk.Label(self.frame, text="Initial Temperature", font=("Arial", 10, "bold"))
+        self.init_temp_entry = tk.Entry(self.frame)
+        self.init_label.grid(row=1, column=0, sticky="w", pady=(10, 0))
+        self.init_temp_entry.grid(row=1, column=1, sticky="w", pady=(10, 0))
+
         self.headers = [
             "Step",
             "Temperature\n(°C)",
@@ -204,39 +153,30 @@ class CrystallizerGUI:
             "Flow Rate 3\n(mL/min)",
             "Flow Rate 4\n(mL/min)"
         ]
-        ttk.Label(self.frame, text=f"Crystallizer {name}", font=FONTS['title']).grid(sticky="w", row=0,
-                                                                                     column=0,
-                                                                                     columnspan=len(self.headers),
-                                                                                     pady=(0, SPACING['lg']))
-        self.init_label = ttk.Label(self.frame, text="Initial Temperature", font=FONTS['heading'])
-        self.init_temp_entry = ttk.Entry(self.frame, font=FONTS['body'])
-        self.init_label.grid(row=1, column=0, sticky="w", pady=(10, 0))
-        self.init_temp_entry.grid(row=1, column=1, sticky="w", pady=(10, 0))
-
-
 
         for col, text in enumerate(self.headers):
-            ttk.Label(self.frame, text=text, font=FONTS['heading'], justify="center").grid(row=2, column=col,
-                                                                                           padx=SPACING['sm'],
-                                                                                           pady=SPACING['md'])
+            tk.Label(self.frame, text=text, font=("Arial", 10, "bold"), justify="center").grid(row=2, column=col)
 
         self.render_rows()
         # Add button
         # Place + and - buttons side by side
         # Frame to hold + and - buttons
-        self.button_frame = ttk.Frame(self.frame)
-        self.add_button = ttk.Button(self.button_frame, text="+", command=self.add_row, width=4)
+        self.button_frame = tk.Frame(self.frame)
+        self.add_button = tk.Button(self.button_frame, text="+", command=self.add_row,
+                                    font=("Arial", 14, "bold"), width=4)
 
-        self.remove_button = ttk.Button(self.button_frame, text="-", command=self.remove_row, width=4)
+        self.remove_button = tk.Button(self.button_frame, text="-", command=self.remove_row,
+                                       font=("Arial", 14, "bold"), width=4,
+                                       disabledforeground="gray", bg="#f0f0f0")
 
         # Repeat steps section
-        self.repeat_label = ttk.Label(self.frame, text="Repeat steps", font=FONTS['body'])
-        self.repeat_entry = ttk.Entry(self.frame, width=10, font=FONTS['body'])
+        self.repeat_label = tk.Label(self.frame, text="Repeat steps", font=("Arial", 10))
+        self.repeat_entry = tk.Entry(self.frame, width=10)
         # Rest temperature row
-        self.rest_label = ttk.Label(self.frame, text="Rest Temperature", font=FONTS['heading'])
-        self.rest_temp_entry = ttk.Entry(self.frame, font=FONTS['body'])
+        self.rest_label = tk.Label(self.frame, text="Rest Temperature", font=("Arial", 10, "bold"))
+        self.rest_temp_entry = tk.Entry(self.frame)
         # Run button
-        self.run_button = ttk.Button(self.frame, text="Run", command=self.run_sequence)
+        self.run_button = tk.Button(self.frame, text="Run", command=self.run_sequence, font=("Arial", 14, "bold"))
         self.render_functionalities()
 
     def run_sequence(self):
@@ -304,28 +244,25 @@ class System2:
         self.root = tk.Tk()
         self.root.title("System Two Control Panel")
         self.root.state('zoomed')  # Maximize window
-        self.root.configure(bg=COLORS['background'])  # Adicione esta linha para o fundo da janela principal
-        self.setup_modern_style()  # Adicione esta linha
-
         self.current_row = 0
         self.different_tabs = False
-        main_frame = ttk.Frame(self.root)
+        main_frame = tk.Frame(self.root)
         main_frame.pack(fill="both", expand=True)
 
         # Split the interface into equipment control and graph
-        left_panel = ttk.Frame(main_frame)
+        left_panel = tk.Frame(main_frame)
         left_panel.pack(side="left", fill="y", padx=10, pady=10)
 
-        right_panel = ttk.Frame(main_frame)
+        right_panel = tk.Frame(main_frame)
         right_panel.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
-        ttk.Label(left_panel, text="System Two Control", font=FONTS['title']).pack(pady=SPACING['lg'])
+        tk.Label(left_panel, text="System Two Control", font=("Arial", 18, "bold")).pack(pady=10)
 
         # Create a canvas with scrollbars for equipment control
-        vscrollbar = ttk.Scrollbar(left_panel, orient="vertical")
+        vscrollbar = tk.Scrollbar(left_panel, orient="vertical")
         vscrollbar.pack(fill="y", side="right", expand=False)
 
-        hscrollbar = ttk.Scrollbar(left_panel, orient="horizontal")
+        hscrollbar = tk.Scrollbar(left_panel, orient="horizontal")
         hscrollbar.pack(fill="x", side="bottom", expand=False)
 
         canvas = tk.Canvas(
@@ -335,7 +272,6 @@ class System2:
             yscrollcommand=vscrollbar.set,
             xscrollcommand=hscrollbar.set,
             width=500,  # Fixed width for equipment panel
-            bg=COLORS['background']  # Adicione esta linha
         )
         canvas.pack(side="left", fill="both", expand=True)
         vscrollbar.config(command=canvas.yview)
@@ -344,7 +280,7 @@ class System2:
         canvas.xview_moveto(0)
         canvas.yview_moveto(0)
 
-        self.interior = ttk.Frame(canvas)
+        self.interior = tk.Frame(canvas)
         canvas.create_window(0, 0, window=self.interior, anchor="nw")
 
         def configure_interior(event):
@@ -367,16 +303,16 @@ class System2:
         if self.different_tabs:
             self.notebook = ttk.Notebook(self.interior)
             self.notebook.pack(fill="both", expand=True)
-            self.gui_frame = ttk.Frame(self.notebook)
+            self.gui_frame = tk.Frame(self.notebook)
             self.gui_frame.pack()
 
             # Create original equipment tab
-            self.equipment_frame = ttk.Frame(self.gui_frame)
+            self.equipment_frame = tk.Frame(self.gui_frame)
             self.equipment_frame.pack()
         else:
-            self.gui_frame = ttk.Frame(self.interior)
-            self.equipment_frame = ttk.Frame(self.gui_frame)
-        enter_button = ttk.Button(self.equipment_frame, text="Assign and Read Data", command=self.open_assign)
+            self.gui_frame = tk.Frame(self.interior)
+            self.equipment_frame = tk.Frame(self.gui_frame)
+        enter_button = tk.Button(self.equipment_frame, text="Assign and Read Data", command=self.open_assign)
         enter_button.pack(anchor="nw", padx=15, pady=15)
 
         ### --- PUMPS --- ###
@@ -394,7 +330,8 @@ class System2:
         ### --- Crystallize Control --- ###
         self.crystallizer_list = [f"Crystallizer {i + 1}" for i in range(len(addresses['Crystallizers']))]
         # Create a single section for all crystallizer buttons
-        crystallizer_section = ttk.LabelFrame(self.equipment_frame, text="Crystallizers", padding=SPACING['md'])
+        crystallizer_section = tk.LabelFrame(self.equipment_frame, text="Crystallizers",
+                                             font=("Arial", 16, "underline"))
         crystallizer_section.pack(anchor="w", padx=10, pady=10)
 
         for i, crystallizer in enumerate(addresses['Crystallizers'].keys()):
@@ -404,8 +341,8 @@ class System2:
             if self.different_tabs:
                 Crystallizer.create_crystallizer_ui()
             else:
-                btn = ttk.Button(crystallizer_section, text=f"Open Crystallizer {i + 1}",
-                                 command=Crystallizer.open_popup, width=20)
+                btn = tk.Button(crystallizer_section, text=f"Open Crystallizer {i + 1}",
+                                command=Crystallizer.open_popup, width=20)
                 btn.pack(anchor="w", padx=10, pady=2)
                 Crystallizer.add_btn(btn)
 
@@ -453,7 +390,7 @@ class System2:
         # Setup for graphs
         self.setup_graphs(right_panel)
 
-        ttk.Button(self.root, text="TEST", command=self.test).place(x=10, y=10)
+        tk.Button(self.root, text="TEST", command=self.test).place(x=10, y=10)
         self.root.bind("<KeyPress>", self.exit_shortcut)  # press escape button on keyboard to close the GUI
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
@@ -461,71 +398,44 @@ class System2:
     def setup_graphs(self, parent_frame):
         """Create the graph UI and initialize graph objects"""
         # Create frame for graph controls
-        graph_control_frame = ttk.Frame(parent_frame)
+        graph_control_frame = tk.Frame(parent_frame)
         graph_control_frame.pack(fill="x", pady=10)
 
         # Labels
-        ttk.Label(graph_control_frame, text="Data Visualization", font=("Arial", 16, "bold")).pack(anchor="w")
+        tk.Label(graph_control_frame, text="Data Visualization", font=("Arial", 16, "bold")).pack(anchor="w")
 
         # Create buttons for graph control
-        control_buttons_frame = ttk.Frame(graph_control_frame)
+        control_buttons_frame = tk.Frame(graph_control_frame)
         control_buttons_frame.pack(fill="x", pady=5)
 
         # Time window control
-        ttk.Label(control_buttons_frame, text="Time Window:", font=FONTS['body']).grid(row=0, column=0, padx=SPACING['sm'])
+        tk.Label(control_buttons_frame, text="Time Window:").grid(row=0, column=0, padx=5)
         self.time_window_var = tk.StringVar(value="3000")
-        time_window_entry = ttk.Entry(control_buttons_frame, textvariable=self.time_window_var, width=6,
-                                      font=FONTS['body'])
+        time_window_entry = tk.Entry(control_buttons_frame, textvariable=self.time_window_var, width=6)
         time_window_entry.grid(row=0, column=1, padx=5)
-        ttk.Label(control_buttons_frame, text="seconds", font=FONTS['body']).grid(row=0, column=2, padx=SPACING['sm'])
-        ttk.Button(control_buttons_frame, text="Set", command=self.set_time_window).grid(row=0, column=3, padx=SPACING['sm'])
+        tk.Label(control_buttons_frame, text="seconds").grid(row=0, column=2, padx=5)
+        tk.Button(control_buttons_frame, text="Set", command=self.set_time_window).grid(row=0, column=3, padx=5)
 
         # Export data button
-        ttk.Button(control_buttons_frame, text="Export Data", command=self.export_graph_data).grid(row=0, column=4,
-                                                                                                   padx=SPACING['xl'])
+        tk.Button(control_buttons_frame, text="Export Data", command=self.export_graph_data).grid(row=0, column=4,
+                                                                                                  padx=20)
 
         # Clear data button
-        ttk.Button(control_buttons_frame, text="Clear All Data", command=self.clear_graph_data).grid(row=0, column=5,
-                                                                                                     padx=SPACING['sm'])
+        tk.Button(control_buttons_frame, text="Clear All Data", command=self.clear_graph_data).grid(row=0, column=5,
+                                                                                                    padx=5)
 
         # Start/Stop graphing
         self.graph_running = True
-        self.graph_button = ttk.Button(control_buttons_frame, text="Stop Graphing", command=self.toggle_graphing)
+        self.graph_button = tk.Button(control_buttons_frame, text="Stop Graphing", bg="light coral",
+                                      command=self.toggle_graphing)
         self.graph_button.grid(row=0, column=6, padx=20)
 
         # Create a frame for the graphs
-        graph_frame = ttk.Frame(parent_frame)
+        graph_frame = tk.Frame(parent_frame)
         graph_frame.pack(fill="both", expand=True, pady=5)
 
         # Configure matplotlib
-        plt.style.use('seaborn-v0_8-whitegrid')  # Adicione esta linha
-        plt.rcParams["text.color"] = COLORS["text"]
-        plt.rcParams["axes.labelcolor"] = COLORS["text"]
-        plt.rcParams["xtick.color"] = COLORS["text"]
-        plt.rcParams["ytick.color"] = COLORS["text"]
-        plt.rcParams["legend.labelcolor"] = COLORS["text"]
-
-        # Configurar a cor da grade para ser mais sutil no tema escuro
-        plt.rcParams["grid.color"] = COLORS["text_secondary"]
-        plt.rcParams["grid.linestyle"] = ":"
-        plt.rcParams["grid.linewidth"] = 0.5
-        fig, self.plot_axes = plt.subplots(2, 2, figsize=(10, 6))
-        # Adicionar bordas aos subplots
-        for ax_row in self.plot_axes:
-            for ax in ax_row:
-                ax.spines["top"].set_edgecolor(COLORS["border"])
-                ax.spines["right"].set_edgecolor(COLORS["border"])
-                ax.spines["bottom"].set_edgecolor(COLORS["border"])
-                ax.spines["left"].set_edgecolor(COLORS["border"])
-
-                ax.spines["top"].set_linewidth(1)
-                ax.spines["right"].set_linewidth(1)
-                ax.spines["bottom"].set_linewidth(1)
-                ax.spines["left"].set_linewidth(1)
-
-                # Opcional: Definir a cor de fundo do plot para contrastar com a borda
-                ax.set_facecolor(COLORS["surface"])
-        fig.patch.set_facecolor(COLORS['background'])  # Adicione esta linha
+        fig, self.plot_axes = plt.subplots(2, 2, figsize=(10, 8))
         self.plot_axes = self.plot_axes.flatten()
 
         # Convert to a tkinter widget
@@ -537,7 +447,7 @@ class System2:
         self.init_graph_data()
 
         # Create data series selector frame
-        data_selector_frame = ttk.Frame(parent_frame)
+        data_selector_frame = tk.Frame(parent_frame)
         data_selector_frame.pack(fill="x", pady=5)
 
         # Create tabs for different types of data
@@ -594,11 +504,11 @@ class System2:
     def create_data_selector_tabs(self, parent_frame):
         """Create tabs for selecting which data series to display"""
         # Create notebook for tabs
-        notebook = ttk.Frame(parent_frame)
+        notebook = tk.Frame(parent_frame)
         notebook.pack(fill="x")
 
         # Create tab buttons
-        tab_frame = ttk.Frame(notebook)
+        tab_frame = tk.Frame(notebook)
         tab_frame.pack(fill="x")
 
         self.tab_buttons = []
@@ -607,32 +517,32 @@ class System2:
         tab_names = ["Temperatures", "Pressures", "Balances", "Flow_Rates"]
 
         for i, name in enumerate(tab_names):
-            button = ttk.Button(tab_frame, text=name,
-                                command=lambda idx=i: self.switch_tab(idx))
+            button = tk.Button(tab_frame, text=name,
+                               command=lambda idx=i: self.switch_tab(idx))
             button.grid(row=0, column=i, padx=5, pady=5, sticky="ew")
             self.tab_buttons.append(button)
 
         # Create content frames for each tab
-        self.tab_content_frame = ttk.Frame(notebook)
+        self.tab_content_frame = tk.Frame(notebook)
         self.tab_content_frame.pack(fill="x", expand=True)
 
         # Create content for temperature tab
-        temp_frame = ttk.Frame(self.tab_content_frame)
+        temp_frame = tk.Frame(self.tab_content_frame)
         self.create_series_selectors(temp_frame, "Temperatures", self.temperatures_list)
         self.tab_frames.append(temp_frame)
 
         # Create content for pressure tab
-        pressure_frame = ttk.Frame(self.tab_content_frame)
+        pressure_frame = tk.Frame(self.tab_content_frame)
         self.create_series_selectors(pressure_frame, "Pressures", self.pressure_transmitters_list)
         self.tab_frames.append(pressure_frame)
 
         # Create content for balance tab - using pump names as balance identifiers
-        balance_frame = ttk.Frame(self.tab_content_frame)
+        balance_frame = tk.Frame(self.tab_content_frame)
         self.create_series_selectors(balance_frame, "Balances", self.balances_list)
         self.tab_frames.append(balance_frame)
 
         # Create content for flow rate tab
-        flow_frame = ttk.Frame(self.tab_content_frame)
+        flow_frame = tk.Frame(self.tab_content_frame)
         self.create_series_selectors(flow_frame, "Flow_Rates", self.pumps_list)
         self.tab_frames.append(flow_frame)
 
@@ -643,9 +553,9 @@ class System2:
         """Switch between data selector tabs"""
         for i, button in enumerate(self.tab_buttons):
             if i == tab_index:
-                button.state(['pressed'])
+                button.config(relief="sunken", bg="light blue")
             else:
-                button.state(['!pressed'])
+                button.config(relief="raised", bg="SystemButtonFace")
 
         for i, frame in enumerate(self.tab_frames):
             if i == tab_index:
@@ -663,13 +573,13 @@ class System2:
             self.checkbox_vars = {}
 
         # Add a 'select all' button
-        all_button = ttk.Button(parent_frame, text=f"Select All {data_type}",
-                                command=lambda: self.toggle_all_series(data_type.lower(), True))
+        all_button = tk.Button(parent_frame, text=f"Select All {data_type}",
+                               command=lambda: self.toggle_all_series(data_type.lower(), True))
         all_button.pack(side="left", padx=5, pady=5)
 
         # Add a 'deselect all' button
-        none_button = ttk.Button(parent_frame, text=f"Deselect All {data_type}",
-                                 command=lambda: self.toggle_all_series(data_type.lower(), False))
+        none_button = tk.Button(parent_frame, text=f"Deselect All {data_type}",
+                                command=lambda: self.toggle_all_series(data_type.lower(), False))
         none_button.pack(side="left", padx=5, pady=5)
 
         # Create a frame for the checkboxes
@@ -682,11 +592,11 @@ class System2:
             expanded_series_list = []
             for name in series_list:
                 # Create a frame for each pump's channels to keep them on one row
-                pump_frame = ttk.Frame(checkbox_frame)
+                pump_frame = tk.Frame(checkbox_frame)
                 pump_frame.pack(anchor="w", pady=2)
 
                 # Add pump label
-                ttk.Label(pump_frame, text=f"{name}:", width=8, anchor="w", font=FONTS['body']).pack(side="left", padx=(0, SPACING['sm']))
+                tk.Label(pump_frame, text=f"{name}:", width=8, anchor="w").pack(side="left", padx=(0, 5))
 
                 for channel in range(1, 5):  # 4 channels
                     # Fix: Use consistent naming format with underscores
@@ -704,7 +614,7 @@ class System2:
                     self.checkbox_vars[f"{data_type.lower()}_{channel_name}"] = var
 
                     # Create the checkbox with a command that updates visibility - pack them side by side
-                    cb = ttk.Checkbutton(
+                    cb = tk.Checkbutton(
                         pump_frame,
                         text=f"Ch{channel}",
                         variable=var,
@@ -727,7 +637,7 @@ class System2:
                 self.checkbox_vars[f"{data_type.lower()}_{name}"] = var
 
                 # Create the checkbox with a command that updates visibility
-                cb = ttk.Checkbutton(
+                cb = tk.Checkbutton(
                     checkbox_frame,
                     text=name,
                     variable=var,
@@ -928,23 +838,23 @@ class System2:
 
     def create_pump_ui(self):
         """Creates UI elements for pumps with the updated PumpControl class structure."""
-        frame = ttk.Frame(self.equipment_frame)
-        ttk.Label(frame, text="Pumps", font=FONTS['subtitle']).grid(sticky="w", row=0, column=0, pady=SPACING['sm'])
+        frame = tk.Frame(self.equipment_frame)
+        tk.Label(frame, text="Pumps", font=("Arial", 16, "underline")).grid(sticky="w", row=0, column=0)
 
         # Updated headers (removed "On" and "Off")
         headers = ["Connect", "Channel Number", "Flow Rates", "Set Flow Rates"]
         for col, text in enumerate(headers, start=1):
-            ttk.Label(frame, text=text, font=FONTS['heading']).grid(row=1, column=col)
+            tk.Label(frame, text=text, font=("Arial", 12, "bold")).grid(row=1, column=col)
 
         row_index = 2
 
         for i, pump_name in enumerate(self.pumps_list):
             # Add pump label for whole pump
-            ttk.Label(frame, text=pump_name, font=FONTS['heading']).grid(
-                row=row_index, column=0, sticky="w", rowspan=4, padx=SPACING['sm'])
+            tk.Label(frame, text=pump_name, font=("Arial", 11, "bold")).grid(
+                row=row_index, column=0, sticky="w", rowspan=4)
 
             # Create a connect button for the whole pump
-            connect_btn = ttk.Button(
+            connect_btn = tk.Button(
                 frame, text="Connect", width=12,
                 command=lambda i=i: self.pump_connect(i))
             connect_btn.grid(row=row_index, column=1, padx=10, rowspan=4)
@@ -959,15 +869,15 @@ class System2:
                 channel_id = f"{i}_{j}"  # Unique ID for each channel
 
                 # Channel label
-                channel_label = ttk.Label(frame, text=f"{channel_num}", font=FONTS['body'])
+                channel_label = tk.Label(frame, text=f"{channel_num}")
                 channel_label.grid(row=row_index + j, column=2, padx=10)
 
                 # Flow rate entry and set button
                 flow_var = tk.StringVar()
-                flow_entry = ttk.Entry(frame, textvariable=flow_var, width=15, font=FONTS['small'])
+                flow_entry = tk.Entry(frame, textvariable=flow_var, width=15)
                 flow_entry.grid(row=row_index + j, column=3, padx=10)
 
-                set_flow_btn = ttk.Button(
+                set_flow_btn = tk.Button(
                     frame, text="Set", width=5,
                     command=lambda i=i, ch=channel_num, v=flow_var: self.pump_set_flow_rate(i, ch, v))
                 set_flow_btn.grid(row=row_index + j, column=4)
@@ -980,7 +890,7 @@ class System2:
 
             # Update separator columnspan (was 7, now 5)
             if i < len(self.pumps_list) - 1:
-                separator = ttk.Separator(frame, orient='horizontal')
+                separator = tk.Frame(frame, height=2, bd=1, relief=tk.SUNKEN)
                 separator.grid(row=row_index, column=0, columnspan=5, sticky="ew", pady=5)
                 row_index += 1
 
@@ -991,7 +901,7 @@ class System2:
         # if not self.pump_connect_vars[pump_index]:  # If not connected
         connect_btn = self.buttons[('pumps', pump_index)]
         if connect_btn:
-            connect_btn.config(state="disabled")
+            connect_btn.config(state="disabled", relief="sunken", bg="#a9a9a9")
         if not self.pump_port_vars[pump_index]:
             address = addresses["Pumps"][pump_index]
             self.pump_port_vars[pump_index] = tk.IntVar(value=address)
@@ -1145,8 +1055,8 @@ class System2:
     def create_equipment_section(self, title, items, connect_command, display_current=False, entry=False,
                                  onoff_buttons=False, peltier=False):
         start = self.current_row
-        frame = ttk.Frame(self.equipment_frame)
-        ttk.Label(self.equipment_frame, text=title, font=FONTS['subtitle']).pack(anchor="nw", padx=15,
+        frame = tk.Frame(self.equipment_frame)
+        tk.Label(self.equipment_frame, text=title, font=("Arial", 16, "underline")).pack(anchor="nw", padx=15,
                                                                                          pady=(10, 0))
         if display_current or entry:
             self.equipment_data[title] = {}
@@ -1159,9 +1069,9 @@ class System2:
 
         for i, name in enumerate(items):
 
-            ttk.Label(frame, text=name).grid(row=i + start, column=0, sticky="w", pady=5)
+            tk.Label(frame, text=name).grid(row=i + start, column=0, sticky="w", pady=5)
             if display_current:  # Temperatures and pressure trasmitters // read float class
-                current_label = ttk.Label(frame, text='', width=10, font=FONTS['body'])
+                current_label = tk.Label(frame, text='', bg="white", borderwidth=1, relief="raised", width=10)
                 current_label.grid(row=i + start, column=1, padx=15)
 
                 if title == 'Temperatures' and peltier and i >= len(addresses['Temperatures']):
@@ -1174,17 +1084,17 @@ class System2:
                     self.register_dictionary[title][name] = tk.IntVar(value=address)
 
                 # connnect button for these two equipments
-                connect_button = ttk.Button(frame, text="Connect", width=12,
+                connect_button = tk.Button(frame, text="Connect", font=("Arial", 12, "bold"), width=12,
                                            command=connect_command)
                 connect_button.grid(row=0, column=0)
                 self.connect_dictionary["buttons"][title] = connect_button
 
             if entry:  # Pressure regulators and stirrers
                 var = tk.StringVar(value="0")
-                entry_field = ttk.Entry(frame, textvariable=var)
+                entry_field = tk.Entry(frame, textvariable=var)
                 entry_field.grid(row=i + start, column=1, padx=15, pady=5)
                 self.equipment_data[title][name] = var
-                (ttk.Button(frame, text="Enter",
+                (tk.Button(frame, text="Enter",
                            command=lambda t=title, n=name, v=var: self.write_float_values(t, n, float(v.get()))
                            ).grid(row=i + start, column=2)
                  )
@@ -1192,8 +1102,10 @@ class System2:
                 self.register_dictionary[title][name] = tk.IntVar(value=address)
 
             if onoff_buttons:  # Pressure in/outs and valves
-                on_btn = ttk.Button(frame, text="On", width=10)
-                off_btn = ttk.Button(frame, text="Off", width=10)
+                on_btn = tk.Button(frame, text="On", width=10)
+                off_btn = tk.Button(frame, text="Off", width=10)
+                on_btn.config(relief=tk.RAISED, state=tk.NORMAL)
+                off_btn.config(relief=tk.RAISED, state=tk.NORMAL)
                 # Define command after both buttons exist
                 on_btn.config(
                     command=lambda t=title, n=name, on_btn=on_btn, off_btn=off_btn: self.toggle_onoff(t, n, True,
@@ -1265,7 +1177,7 @@ class System2:
         :param read_type: String type of data to read if read_float is True.
         """
         connect_button = self.connect_dictionary["buttons"][device_name]
-        connect_button.config(state="disabled")
+        connect_button.config(state="disabled", relief="sunken", bg="#a9a9a9")
         peltier = False
         if peltier_object:
             peltier = True
@@ -1284,7 +1196,7 @@ class System2:
         Needs to be different from other methods since it requires a COM connection instead of plc
         """
         connect_button = self.connect_dictionary["buttons"][device_name]
-        connect_button.config(state="disabled")
+        connect_button.config(state="disabled", relief="sunken", bg="#a9a9a9")
 
         balance.connect()
         if read_float:
@@ -1297,7 +1209,7 @@ class System2:
         Needs to be different from other methods since it requires a COM connection instead of plc
         """
         connect_peltier = self.connect_dictionary["peltiers"][device_name]
-        connect_peltier.config(state="disabled")
+        connect_peltier.config(state="disabled", relief="sunken", bg="#a9a9a9")
         peltier.connect()
 
     def temperature_connect(self):
@@ -1620,6 +1532,12 @@ class System2:
         Turn equipment on or off
         equipment type is "Pressure In/Outs" or "Valves"
         """
+        if boolean:
+            on_btn.config(state=tk.DISABLED, relief=tk.SUNKEN)
+            off_btn.config(state=tk.NORMAL, relief=tk.RAISED)
+        else:
+            off_btn.config(state=tk.DISABLED, relief=tk.SUNKEN)
+            on_btn.config(state=tk.NORMAL, relief=tk.RAISED)
         if equipment_type == "Pressure In/Outs":
             plc_object = self.pressure_inout_plc
         elif equipment_type == "Valves":
@@ -1658,102 +1576,6 @@ class System2:
         self.root.destroy()
         sys.exit(0)
 
-    def setup_modern_style(self):
-        """Configure modern ttk styles"""
-        style = ttk.Style()
-        style.theme_use('clam')  # Ou 'alt', 'default', 'vista' dependendo do OS e preferência
-
-        # Configure button styles
-        style.configure('TButton',
-                        font=FONTS['button'],
-                        padding=(SPACING['md'], SPACING['sm']),
-                        background=COLORS['primary'],
-                        foreground=COLORS['surface'])
-
-        style.map('TButton',
-                  background=[('active', COLORS['primary_hover']),
-                              ('pressed', COLORS['primary'])],
-                  foreground=[('disabled', COLORS['disabled'])])
-
-        # Configure label styles
-        style.configure('TLabel',
-                        font=FONTS['body'],
-                        background=COLORS['background'],
-                        foreground=COLORS['text'])
-
-        style.configure('Heading.TLabel',
-                        font=FONTS['heading'])
-
-        style.configure('Title.TLabel',
-                        font=FONTS['title'])
-
-        # Configure entry styles
-        style.configure('TEntry',
-                        font=FONTS['body'],
-                        padding=SPACING['sm'],
-                        fieldbackground=COLORS['surface'],
-                        foreground=COLORS['text'],
-                        bordercolor=COLORS['border'],
-                        lightcolor=COLORS['border'],
-                        darkcolor=COLORS['border'])
-
-        # Configure frame styles
-        style.configure('TFrame',
-                        background=COLORS['background'])
-
-        # Configure labelframe styles
-        style.configure('TLabelframe',
-                        background=COLORS['background'],
-                        borderwidth=1,
-                        relief='solid',
-                        bordercolor=COLORS['border'])
-
-        style.configure('TLabelframe.Label',
-                        font=FONTS['subtitle'],
-                        background=COLORS['background'],
-                        foreground=COLORS['text'])
-
-        # Configure Notebook (Tabs) styles
-        style.configure('TNotebook',
-                        background=COLORS['background'],
-                        borderwidth=0)
-        style.configure('TNotebook.Tab',
-                        background=COLORS['secondary'],
-                        foreground=COLORS['surface'],
-                        padding=[SPACING['md'], SPACING['sm']])
-        style.map('TNotebook.Tab',
-                  background=[('selected', COLORS['primary'])],
-                  foreground=[('selected', COLORS['surface'])])
-
-        # Configure Scrollbar styles
-        style.configure('Vertical.TScrollbar',
-                        background=COLORS['border'],
-                        troughcolor=COLORS['background'],
-                        bordercolor=COLORS['border'])
-        style.configure('Horizontal.TScrollbar',
-                        background=COLORS['border'],
-                        troughcolor=COLORS['background'],
-                        bordercolor=COLORS['border'])
-
-        # Configure Checkbutton styles
-        style.configure('TCheckbutton',
-                        background=COLORS['background'],
-                        foreground=COLORS['text'],
-                        font=FONTS['body'])
-        style.map('TCheckbutton',
-                  background=[('active', COLORS['background'])])
-
-        # Configure Radiobutton styles (if used)
-        style.configure('TRadiobutton',
-                        background=COLORS['background'],
-                        foreground=COLORS['text'],
-                        font=FONTS['body'])
-        style.map('TRadiobutton',
-                  background=[('active', COLORS['background'])])
-
-        # Configure Canvas background
-        style.configure('TCanvas',
-                        background=COLORS['background'])
     def test(self):
         print('Test balance connection')
         p = f'COM{5}'

@@ -49,7 +49,7 @@ import serial
 import time
 import re
 
-balance_ser = serial.Serial('COM13', baudrate=9600, timeout=1)
+balance_ser = serial.Serial('COM12', baudrate=9600, timeout=1)
 balance_ser.write(b'P\r\n')  # Ask the balance to print
 time.sleep(0.1)
 lines = []
