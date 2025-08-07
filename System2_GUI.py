@@ -6,8 +6,8 @@ from ast import Index
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from .System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC, Balance, Peltier
-from .System2_utils import Graph, DataCollector
+from System2_Equipment import Pump, ReadFloatsPLC, OneBitClass, WriteFloatsPLC, Balance, Peltier
+from System2_utils import Graph, DataCollector
 import serial
 import time
 import sys
